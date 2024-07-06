@@ -92,7 +92,7 @@ namespace ByeByeHomelessMod
 
         public override int GetUpdateInterval(SystemUpdatePhase phase)
         {
-            return 16;
+            return 262144 / 16; // every one and a half game hour
         }
 
         [Preserve]

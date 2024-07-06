@@ -1,6 +1,6 @@
 # CS2-ByeByeHomelessMod
 
-When a household loses its home, it will be immediately deleted.
+When a household loses its home, it will be deleted within one and half game hours if it fails to find a shelter.
 
 This is a temporary solution to the homeless bug, keeping your city free of performance-draining homeless citizens until the developers return from their holidays.
 
