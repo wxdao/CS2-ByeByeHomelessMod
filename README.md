@@ -1,9 +1,13 @@
 # CS2-ByeByeHomelessMod
 
-When a household loses its home, it will be deleted within one and half game hours if it fails to find a shelter.
+Every one and a half game hours, the mod deletes any homeless household that fails to find a house or shelter (e.g., parks).
 
-This is a temporary solution to the homeless bug, keeping your city free of performance-draining homeless citizens until the developers return from their holidays.
+While working on this mod, I discovered that my city of 70,000 residents had 50,000 households stuck in the MovingAway state without being properly deleted. No wonder there are so many strange issues in the game. This mod will also delete these abnormal households.
+
+Once these abnormal households are gone, you'll be pleasantly surprised to find that new homeless households, such as those resulting from a building demolition, can generally find new homes or parks, reducing the likelihood of them getting stuck on the streets.
+
+So, I believe that the large number of stuck, undeleted homeless households is the root cause of this bug, which is fixed by this mod.
 
 ## Important Notes
 
-This mod has not been heavily tested. It is recommended to back up your saves before using it and to monitor your game for any issues over a period of time.
+After some testing and tracking of households and their members, I'm fairly confident this mod won't cause save file corruption. However, it's always best to be cautious, so I recommend backing up your save files first.

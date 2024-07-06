@@ -21,6 +21,7 @@ using Unity.Entities;
 using Unity.Jobs;
 using UnityEngine.Scripting;
 using Unity.Mathematics;
+using Colossal.Json;
 
 namespace ByeByeHomelessMod
 {
@@ -54,11 +55,30 @@ namespace ByeByeHomelessMod
             [ReadOnly]
             public EntityTypeHandle m_EntityType;
 
+            [ReadOnly]
+            public ComponentTypeHandle<MovingAway> m_MovingAwayType;
+
             public EntityCommandBuffer.ParallelWriter m_CommandBuffer;
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
                 NativeArray<Entity> nativeArray = chunk.GetNativeArray(m_EntityType);
+
+                if (chunk.Has(ref m_MovingAwayType))
+                {
+                    NativeArray<MovingAway> nativeArray2 = chunk.GetNativeArray(ref m_MovingAwayType);
+                    for (int i = 0; i < nativeArray.Length; i++)
+                    {
+                        Entity entity = nativeArray[i];
+                        MovingAway movingAway = nativeArray2[i];
+                        if (movingAway.m_Target == Entity.Null)
+                        {
+                            m_CommandBuffer.AddComponent(unfilteredChunkIndex, entity, default(Deleted));
+                        }
+                    }
+                    return;
+                }
+
                 for (int i = 0; i < nativeArray.Length; i++)
                 {
                     Entity entity = nativeArray[i];
@@ -77,10 +97,14 @@ namespace ByeByeHomelessMod
             [ReadOnly]
             public EntityTypeHandle __Unity_Entities_Entity_TypeHandle;
 
+            [ReadOnly]
+            public ComponentTypeHandle<MovingAway> __Game_Agents_MovingAway_ComponentTypeHandle;
+
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void __AssignHandles(ref SystemState state)
             {
                 __Unity_Entities_Entity_TypeHandle = state.GetEntityTypeHandle();
+                __Game_Agents_MovingAway_ComponentTypeHandle = state.GetComponentTypeHandle<MovingAway>();
             }
         }
 
@@ -108,8 +132,11 @@ namespace ByeByeHomelessMod
         protected override void OnUpdate()
         {
             __TypeHandle.__Unity_Entities_Entity_TypeHandle.Update(ref base.CheckedStateRef);
+            __TypeHandle.__Game_Agents_MovingAway_ComponentTypeHandle.Update(ref base.CheckedStateRef);
+
             ByeByeHomelessJob byeByeHomelessJob = default(ByeByeHomelessJob);
             byeByeHomelessJob.m_EntityType = __TypeHandle.__Unity_Entities_Entity_TypeHandle;
+            byeByeHomelessJob.m_MovingAwayType = __TypeHandle.__Game_Agents_MovingAway_ComponentTypeHandle;
             byeByeHomelessJob.m_CommandBuffer = m_EndFrameBarrier.CreateCommandBuffer().AsParallelWriter();
             ByeByeHomelessJob jobData = byeByeHomelessJob;
             base.Dependency = JobChunkExtensions.ScheduleParallel(jobData, m_HomelessGroup, base.Dependency);
