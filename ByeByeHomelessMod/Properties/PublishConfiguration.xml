@@ -23,6 +23,7 @@ After some testing and tracking of households and their members, I'm fairly conf
 	<Thumbnail Value="Properties/Thumbnail.png" />
 	<!--Screenshot, can be set multiple times-->
 	<Screenshot Value="Properties/Screenshot01.png" />
+	<Screenshot Value="Properties/Screenshot02.png" />
 	<!--Tag, can be set multiple times-->
 	<Tag Value="" />
 	<!--Link to the forum post where the mod can be discussed-->
