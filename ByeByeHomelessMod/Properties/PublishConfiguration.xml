@@ -4,12 +4,12 @@
 	<!--Name of the mod to display to players-->
 	<DisplayName Value="Bye Bye Homeless" />
 	<!--Short description of the mod-->
-	<ShortDescription Value="Remove stuck homeless citizens from the streets." />
+	<ShortDescription Value="Evict stuck homeless citizens from the streets." />
 	<!--Long description of the mod. Single line or multi line. Supports minimal markdown subset-->
 	<LongDescription>
-Every one and a half game hours, the mod deletes any homeless household that fails to find a house or shelter (e.g., parks).
+Every one and a half in-game hours, the mod evicts any homeless household that fails to find a house or shelter (e.g., parks). You can configure the eviction period and method (either letting them move out of the city or simply deleting them) in the settings.
 
-While working on this mod, I discovered that my city of 70,000 residents had 50,000 households stuck in the MovingAway state without being properly deleted. No wonder there are so many strange issues in the game. This mod will also delete these abnormal households.
+While working on this mod, I discovered that my city of 70,000 residents had 50,000 households stuck finding new homes or in invalid MovingAway state without being properly deleted. No wonder there are so many strange issues in the game. This mod will also delete these abnormal households.
 
 Once these abnormal households are gone, you'll be pleasantly surprised to find that new homeless households, such as those resulting from a building demolition, can generally find new homes or parks, reducing the likelihood of them getting stuck on the streets.
 
@@ -22,21 +22,26 @@ After some testing and tracking of households and their members, I'm fairly conf
 	<!--Thumbnail-->
 	<Thumbnail Value="Properties/Thumbnail.png" />
 	<!--Screenshot, can be set multiple times-->
-	<Screenshot Value="" />
+	<Screenshot Value="Properties/Screenshot01.png" />
 	<!--Tag, can be set multiple times-->
 	<Tag Value="" />
 	<!--Link to the forum post where the mod can be discussed-->
-	<ForumLink Value="" />
+	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/bye-bye-homeless.1694220/" />
 	<!--Version of the mod-->
-	<ModVersion Value="1.0.3" />
+	<ModVersion Value="1.1.0" />
 	<!--Recommended version of the base game to use the mod-->
 	<GameVersion Value="1.1.*" />
 	<!--Dependency for the mod, can be set multiple times-->
 	<Dependency Id="" />
 	<!--Change log for new version. Single line or multi line. Supports minimal markdown subset-->
-	<ChangeLog Value="Not to delete households with valid MovingAway status." />
-	<!--ChangeLog>
-	</ChangeLog-->
+	<ChangeLog>
+- Added two eviction methods and eviction period settings.
+
+- Changed the default method to moving out instead of deletion.
+
+Thanks to Nullpointer for the settings implementation.
+	</ChangeLog>
 	<!--External link. supported types are discord, github, youtube, twitch, x, paypal, patreon, buymeacoffee, kofi, crowdin, gitlab-->
 	<ExternalLink Type="github" Url="https://github.com/wxdao/CS2-ByeByeHomelessMod" />
+	<ExternalLink Type="discord" Url="https://discord.gg/HTav7ARPs2" />
 </Publish>
