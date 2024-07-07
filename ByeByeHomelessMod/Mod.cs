@@ -1,33 +1,33 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System;
+using System.Runtime.CompilerServices;
+
+using Colossal.IO.AssetDatabase;
 using Colossal.Logging;
+
 using Game;
 using Game.Agents;
 using Game.Buildings;
 using Game.Citizens;
-using Game.City;
 using Game.Common;
-using Game.Economy;
 using Game.Modding;
-using Game.Prefabs;
 using Game.SceneFlow;
-using Game.Simulation;
 using Game.Tools;
-using Game.Triggers;
-using Game.Vehicles;
-using Unity.Burst.Intrinsics;
 using Unity.Burst;
+using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Entities;
-using Unity.Jobs;
-using UnityEngine.Scripting;
 using Unity.Mathematics;
-using Colossal.Json;
+
+using UnityEngine.Scripting;
 
 namespace ByeByeHomelessMod
 {
     public class Mod : IMod
     {
         public static ILog log = LogManager.GetLogger($"{nameof(ByeByeHomelessMod)}.{nameof(Mod)}").SetShowsErrorsInUI(false);
+        public Setting Setting { get; private set; }
+
+        public static Mod Instance { get; private set; }
 
         public void OnLoad(UpdateSystem updateSystem)
         {
@@ -36,6 +36,12 @@ namespace ByeByeHomelessMod
             if (GameManager.instance.modManager.TryGetExecutableAsset(this, out var asset))
                 log.Info($"Current mod asset at {asset.path}");
 
+            Setting = new Setting(this);
+            Setting.RegisterInOptionsUI();
+            GameManager.instance.localizationManager.AddSource("en-US", new LocaleEN(Setting));
+            AssetDatabase.global.LoadSettings(nameof(Mod), Setting, new Setting(this));
+            log.Info($"Homeless Cleaner will run per {Setting.TimeInterval} hour(s).");
+            Instance = this;
             updateSystem.UpdateAt<ByeByeHomelessSystem>(SystemUpdatePhase.GameSimulation);
         }
 
@@ -44,7 +50,6 @@ namespace ByeByeHomelessMod
             log.Info(nameof(OnDispose));
         }
     }
-
 
     public partial class ByeByeHomelessSystem : GameSystemBase
     {
@@ -79,9 +84,8 @@ namespace ByeByeHomelessMod
                     return;
                 }
 
-                for (int i = 0; i < nativeArray.Length; i++)
+                foreach (var entity in nativeArray)
                 {
-                    Entity entity = nativeArray[i];
                     m_CommandBuffer.AddComponent(unfilteredChunkIndex, entity, default(Deleted));
                 }
             }
@@ -116,14 +120,23 @@ namespace ByeByeHomelessMod
 
         public override int GetUpdateInterval(SystemUpdatePhase phase)
         {
-            return 262144 / 16; // every one and a half game hour
+            var v = (int)math.floor(10922 * Mod.Instance.Setting.TimeInterval);
+            if (v < 1)
+                return 1;
+            v--;
+            v |= v >> 1;
+            v |= v >> 2;
+            v |= v >> 4;
+            v |= v >> 8;
+            v |= v >> 16;
+            return v + 1;
         }
 
         [Preserve]
         protected override void OnCreate()
         {
             base.OnCreate();
-            m_EndFrameBarrier = base.World.GetOrCreateSystemManaged<EndFrameBarrier>();
+            m_EndFrameBarrier = World.GetOrCreateSystemManaged<EndFrameBarrier>();
             m_HomelessGroup = GetEntityQuery(ComponentType.ReadOnly<Household>(), ComponentType.ReadOnly<HouseholdCitizen>(), ComponentType.Exclude<CommuterHousehold>(), ComponentType.Exclude<TouristHousehold>(), ComponentType.Exclude<PropertyRenter>(), ComponentType.Exclude<Deleted>(), ComponentType.Exclude<Temp>());
             RequireForUpdate(m_HomelessGroup);
         }
@@ -131,16 +144,16 @@ namespace ByeByeHomelessMod
         [Preserve]
         protected override void OnUpdate()
         {
-            __TypeHandle.__Unity_Entities_Entity_TypeHandle.Update(ref base.CheckedStateRef);
-            __TypeHandle.__Game_Agents_MovingAway_ComponentTypeHandle.Update(ref base.CheckedStateRef);
+            __TypeHandle.__Unity_Entities_Entity_TypeHandle.Update(ref CheckedStateRef);
+            __TypeHandle.__Game_Agents_MovingAway_ComponentTypeHandle.Update(ref CheckedStateRef);
 
-            ByeByeHomelessJob byeByeHomelessJob = default(ByeByeHomelessJob);
+            var byeByeHomelessJob = default(ByeByeHomelessJob);
             byeByeHomelessJob.m_EntityType = __TypeHandle.__Unity_Entities_Entity_TypeHandle;
             byeByeHomelessJob.m_MovingAwayType = __TypeHandle.__Game_Agents_MovingAway_ComponentTypeHandle;
             byeByeHomelessJob.m_CommandBuffer = m_EndFrameBarrier.CreateCommandBuffer().AsParallelWriter();
-            ByeByeHomelessJob jobData = byeByeHomelessJob;
-            base.Dependency = JobChunkExtensions.ScheduleParallel(jobData, m_HomelessGroup, base.Dependency);
-            m_EndFrameBarrier.AddJobHandleForProducer(base.Dependency);
+            var jobData = byeByeHomelessJob;
+            Dependency = jobData.ScheduleParallel(m_HomelessGroup, Dependency);
+            m_EndFrameBarrier.AddJobHandleForProducer(Dependency);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -151,8 +164,8 @@ namespace ByeByeHomelessMod
         protected override void OnCreateForCompiler()
         {
             base.OnCreateForCompiler();
-            __AssignQueries(ref base.CheckedStateRef);
-            __TypeHandle.__AssignHandles(ref base.CheckedStateRef);
+            __AssignQueries(ref CheckedStateRef);
+            __TypeHandle.__AssignHandles(ref CheckedStateRef);
         }
 
         [Preserve]
