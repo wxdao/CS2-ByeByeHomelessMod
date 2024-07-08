@@ -15,6 +15,12 @@ Once these abnormal households are gone, you'll be pleasantly surprised to find 
 
 So, I believe that the large number of stuck, undeleted homeless households is the root cause of this bug, which is fixed by this mod.
 
+## How is the mod different from the "disable homeless" toggle in developer mode
+
+The "disable homeless" toggle in developer mode deletes households with the HomelessHousehold component. However, the game is bugged, so many homeless households never acquire this component. It seems only those camping in parks fall under this category, while the more problematic ones stuck on the streets do not. Additionally, there is another bug in the game (omg, why is this game so buggy) causing citizens deleted by this toggle to get stuck at the map's edge. They remain in the game and continue to be counted, which drags down performance.
+
+On the contrary this mod only evicts the bugged homeless stuck on the streets, allowing the game's homeless system to remain active rather than being completely disabled.
+
 ## Important Notes
 
 After some testing and tracking of households and their members, I'm fairly confident this mod won't cause save file corruption. However, it's always best to be cautious, so I recommend backing up your save files first.
@@ -22,25 +28,25 @@ After some testing and tracking of households and their members, I'm fairly conf
 	<!--Thumbnail-->
 	<Thumbnail Value="Properties/Thumbnail.png" />
 	<!--Screenshot, can be set multiple times-->
-	<Screenshot Value="Properties/Screenshot01.png" />
 	<Screenshot Value="Properties/Screenshot02.png" />
+	<Screenshot Value="Properties/Screenshot01.png" />
 	<!--Tag, can be set multiple times-->
 	<Tag Value="" />
 	<!--Link to the forum post where the mod can be discussed-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/bye-bye-homeless.1694220/" />
 	<!--Version of the mod-->
-	<ModVersion Value="1.1.0" />
+	<ModVersion Value="1.2.0" />
 	<!--Recommended version of the base game to use the mod-->
 	<GameVersion Value="1.1.*" />
 	<!--Dependency for the mod, can be set multiple times-->
 	<Dependency Id="" />
 	<!--Change log for new version. Single line or multi line. Supports minimal markdown subset-->
 	<ChangeLog>
-- Added two eviction methods and eviction period settings.
+- Enabled ButstCompile.
 
-- Changed the default method to moving out instead of deletion.
+- Will correctly update the moving-away section of city statistics.
 
-Thanks to Nullpointer for the settings implementation.
+- Added experimental Evict Ghost Companies toggle.
 	</ChangeLog>
 	<!--External link. supported types are discord, github, youtube, twitch, x, paypal, patreon, buymeacoffee, kofi, crowdin, gitlab-->
 	<ExternalLink Type="github" Url="https://github.com/wxdao/CS2-ByeByeHomelessMod" />
