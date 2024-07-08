@@ -205,7 +205,7 @@ namespace ByeByeHomelessMod
                 for (int i = 0; i < nativeArray.Length; i++)
                 {
                     Entity entity = nativeArray[i];
-                    m_CommandBuffer.AddComponent(unfilteredChunkIndex, entity, default(MovingAway));
+                    m_CommandBuffer.AddComponent<MovingAway>(unfilteredChunkIndex, entity);
                     m_CommandBuffer.RemoveComponent<PropertySeeker>(unfilteredChunkIndex, entity);
                 }
             }
