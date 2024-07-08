@@ -250,14 +250,15 @@ namespace ByeByeHomelessMod
         {
             ByeByeHomelessJob byeByeHomelessJob;
             byeByeHomelessJob.m_EntityType = SystemAPI.GetEntityTypeHandle();
-            byeByeHomelessJob.m_MovingAwayType = SystemAPI.GetComponentTypeHandle<MovingAway>();
-            byeByeHomelessJob.m_Households = SystemAPI.GetComponentLookup<Household>();
-            byeByeHomelessJob.m_HouseholdCitizenType = SystemAPI.GetBufferTypeHandle<HouseholdCitizen>();
+            byeByeHomelessJob.m_MovingAwayType = SystemAPI.GetComponentTypeHandle<MovingAway>(isReadOnly: true);
+            byeByeHomelessJob.m_Households = SystemAPI.GetComponentLookup<Household>(isReadOnly: true);
+            byeByeHomelessJob.m_HouseholdCitizenType = SystemAPI.GetBufferTypeHandle<HouseholdCitizen>(isReadOnly: true);
             byeByeHomelessJob.m_CommandBuffer = m_EndFrameBarrier.CreateCommandBuffer().AsParallelWriter();
             byeByeHomelessJob.actionDelete = Mod.Instance.Setting.ActionDelete;
             byeByeHomelessJob.m_StatisticsQueue = m_CityStatisticsSystem.GetStatisticsEventQueue(out var deps).AsParallelWriter();
             ByeByeHomelessJob jobData = byeByeHomelessJob;
             base.Dependency = JobChunkExtensions.ScheduleParallel(jobData, m_HomelessGroup, JobHandle.CombineDependencies(base.Dependency, deps));
+            m_CityStatisticsSystem.AddWriter(base.Dependency);
             m_EndFrameBarrier.AddJobHandleForProducer(base.Dependency);
         }
 
