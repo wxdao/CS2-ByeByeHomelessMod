@@ -29,6 +29,9 @@ using Game.UI;
 using System.Collections.Generic;
 using static ByeByeHomelessMod.Setting;
 using Game.Companies;
+using Game.PSI;
+using Colossal.PSI.Common;
+using Colossal.Entities;
 
 namespace ByeByeHomelessMod
 {
@@ -50,11 +53,40 @@ namespace ByeByeHomelessMod
                 log.Info($"Current mod asset at {asset.path}");
 
             Setting = new Setting(this);
-            Setting.RegisterInOptionsUI();
 
             GameManager.instance.localizationManager.AddSource("en-US", new LocaleEN(Setting));
 
+            log.Info($"Game version: {Game.Version.current.shortVersion}");
+            if (Game.Version.current.shortVersion != "1.1.8f1")
+            {
+                NotificationSystem.Push("BBH_VERSION_NOTICE", "Bye Bye Homeless", "The mod is disabled due to unsupported game version.", null, null, null, ProgressState.Warning, null, delegate
+                {
+                    var dialog = new MessageDialog("Bye Bye Homeless", "The mod has been automatically shut down to avoid compatibility issues. Stay tuned for further updates.", "OK");
+                    GameManager.instance.userInterface.appBindings.ShowMessageDialog(dialog, delegate (int msg)
+                    {
+                        NotificationSystem.Pop("BBH_VERSION_NOTICE");
+                    });
+                });
+                log.Info($"Mod disabled.");
+                return;
+            }
+
+            Setting.RegisterInOptionsUI();
+
             AssetDatabase.global.LoadSettings(nameof(Mod), Setting, new Setting(this));
+
+            if (Setting.ShowUpdateNotice20240909)
+            {
+                NotificationSystem.Push("BBH_UPDATE_NOTICE", "Bye Bye Homeless", "The mod has been updated and re-enabled. Click to learn more.", null, null, null, ProgressState.None, null, delegate
+                {
+                    var dialog = new MessageDialog("Bye Bye Homeless", "There used to be a bug where citizens moving in were prioritized over the homeless when assigning houses, but that got fixed with the 1.1.8f game update. Now homeless citizens still searching for a place can move into new homes if you zone more for them.\n\n\n\nHowever, testing has shown that in some cases, homeless citizens who had already decided to move away can still get stuck forever. The mod has been updated to help them break free from limbo.", "OK");
+                    GameManager.instance.userInterface.appBindings.ShowMessageDialog(dialog, delegate (int msg)
+                    {
+                        Setting.ShowUpdateNotice20240909 = false;
+                        NotificationSystem.Pop("BBH_UPDATE_NOTICE");
+                    });
+                });
+            }
 
             updateSystem.UpdateAt<ByeByeHomelessSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAt<ByeByeExtraCompanySystem>(SystemUpdatePhase.GameSimulation);
@@ -66,7 +98,7 @@ namespace ByeByeHomelessMod
         }
     }
 
-    [FileLocation("ModSettings/ByeByeHomeless/setting.coc")]
+    [FileLocation("ModsSettings/ByeByeHomeless/setting.coc")]
     public class Setting : ModSetting
     {
         public Setting(IMod mod) : base(mod)
@@ -74,7 +106,8 @@ namespace ByeByeHomelessMod
             SetDefaults();
         }
 
-        public bool ActionDelete { get; set; }
+        [SettingsUIHidden]
+        public bool ShowUpdateNotice20240909 { get; set; }
 
         public enum TickIntervalOptions
         {
@@ -83,16 +116,13 @@ namespace ByeByeHomelessMod
             M180,
         }
 
-        public TickIntervalOptions TickInterval { get; set; }
-
         public bool EvictExtraCompany { get; set; }
 
         public TickIntervalOptions DeleteExtraCompanyTickInterval { get; set; }
 
         public override void SetDefaults()
         {
-            ActionDelete = false;
-            TickInterval = TickIntervalOptions.M90;
+            ShowUpdateNotice20240909 = true;
             EvictExtraCompany = false;
             DeleteExtraCompanyTickInterval = TickIntervalOptions.M90;
         }
@@ -112,10 +142,6 @@ namespace ByeByeHomelessMod
             return new Dictionary<string, string>
             {
                 { _mSetting.GetSettingsLocaleID(), "Bye Bye Homeless" },
-                { _mSetting.GetOptionLabelLocaleID(nameof(Setting.ActionDelete)), "Delete Instead of Move" },
-                { _mSetting.GetOptionDescLocaleID(nameof(Setting.ActionDelete)), "When checked, stuck homeless households will be deleted instead of being forced to move out of the city." },
-                { _mSetting.GetOptionLabelLocaleID(nameof(Setting.TickInterval)), "Eviction Period" },
-                { _mSetting.GetOptionDescLocaleID(nameof(Setting.TickInterval)), "The maximum amount of time the homeless have to find a new house or shelter before being evicted. Requires a restart to take effect." },
                 { _mSetting.GetOptionLabelLocaleID(nameof(Setting.EvictExtraCompany)), "Evict Ghost Companies" },
                 { _mSetting.GetOptionDescLocaleID(nameof(Setting.EvictExtraCompany)), "[EXPERIMENTAL] When checked, companies without factories or offices will be evicted." },
                 { _mSetting.GetOptionLabelLocaleID(nameof(Setting.DeleteExtraCompanyTickInterval)), "Ghost Companies Eviction Period" },
@@ -140,73 +166,72 @@ namespace ByeByeHomelessMod
             public EntityTypeHandle m_EntityType;
 
             [ReadOnly]
-            public ComponentLookup<Household> m_Households;
+            public ComponentTypeHandle<Household> m_HouseholdType;
 
             [ReadOnly]
             public BufferTypeHandle<HouseholdCitizen> m_HouseholdCitizenType;
 
             [ReadOnly]
-            public ComponentTypeHandle<MovingAway> m_MovingAwayType;
+            public ComponentLookup<TravelPurpose> m_TravelPurposeLookup;
+
+            [ReadOnly]
+            public ComponentLookup<CurrentTransport> m_CurrentTransportLookup;
 
             public EntityCommandBuffer.ParallelWriter m_CommandBuffer;
 
             public NativeQueue<StatisticsEvent>.ParallelWriter m_StatisticsQueue;
 
-            public bool actionDelete;
-
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                NativeArray<Entity> nativeArray = chunk.GetNativeArray(m_EntityType);
-                BufferAccessor<HouseholdCitizen> bufferAccessor = chunk.GetBufferAccessor(ref m_HouseholdCitizenType);
+                NativeArray<Entity> entities = chunk.GetNativeArray(m_EntityType);
+                NativeArray<Household> households = chunk.GetNativeArray(ref m_HouseholdType);
+                BufferAccessor<HouseholdCitizen> householdCitizensBuffer = chunk.GetBufferAccessor(ref m_HouseholdCitizenType);
 
-                if (actionDelete)
+                for (int i = 0; i < households.Length; i++)
                 {
-                    for (int i = 0; i < nativeArray.Length; i++)
+                    Entity entity = entities[i];
+                    Household household = households[i];
+
+                    if (householdCitizensBuffer.Length == 0)
                     {
-                        Entity entity = nativeArray[i];
-                        DynamicBuffer<HouseholdCitizen> dynamicBuffer = bufferAccessor[i];
-                        if ((m_Households[entity].m_Flags & HouseholdFlags.MovedIn) != 0)
+                        m_CommandBuffer.AddComponent(unfilteredChunkIndex, entity, default(Deleted));
+                        return;
+                    }
+                    DynamicBuffer<HouseholdCitizen> householdCitizens = householdCitizensBuffer[i];
+                    if (householdCitizens.Length == 0)
+                    {
+                        m_CommandBuffer.AddComponent(unfilteredChunkIndex, entity, default(Deleted));
+                        return;
+                    }
+
+                    for (int j = 0; j < householdCitizens.Length; j++)
+                    {
+                        Entity citizen = householdCitizens[j].m_Citizen;
+
+                        if (!m_CurrentTransportLookup.TryGetComponent(citizen, out var currentTransport))
                         {
                             m_StatisticsQueue.Enqueue(new StatisticsEvent
                             {
                                 m_Statistic = StatisticType.CitizensMovedAway,
-                                m_Change = dynamicBuffer.Length
+                                m_Change = 1
                             });
+                            m_CommandBuffer.AddComponent(unfilteredChunkIndex, citizen, default(Deleted));
+                            continue;
                         }
-                        m_CommandBuffer.AddComponent(unfilteredChunkIndex, entity, default(Deleted));
-                    }
-                    return;
-                }
 
-                if (chunk.Has(ref m_MovingAwayType))
-                {
-                    NativeArray<MovingAway> nativeArray2 = chunk.GetNativeArray(ref m_MovingAwayType);
-                    for (int i = 0; i < nativeArray.Length; i++)
-                    {
-                        Entity entity = nativeArray[i];
-                        DynamicBuffer<HouseholdCitizen> dynamicBuffer = bufferAccessor[i];
-                        MovingAway movingAway = nativeArray2[i];
-                        if (movingAway.m_Target == Entity.Null)
+                        if (!m_TravelPurposeLookup.TryGetComponent(citizen, out var travelPurpose) || travelPurpose.m_Purpose != Purpose.MovingAway)
                         {
-                            if ((m_Households[entity].m_Flags & HouseholdFlags.MovedIn) != 0)
+                            m_CommandBuffer.AddComponent(unfilteredChunkIndex, citizen, new TravelPurpose
                             {
-                                m_StatisticsQueue.Enqueue(new StatisticsEvent
-                                {
-                                    m_Statistic = StatisticType.CitizensMovedAway,
-                                    m_Change = dynamicBuffer.Length
-                                });
-                            }
-                            m_CommandBuffer.AddComponent(unfilteredChunkIndex, entity, default(Deleted));
+                                m_Purpose = Purpose.MovingAway,
+                            });
+                            m_CommandBuffer.AddComponent(unfilteredChunkIndex, currentTransport.m_CurrentTransport, new Target
+                            {
+                                m_Target = Entity.Null,
+                            });
+                            continue;
                         }
                     }
-                    return;
-                }
-
-                for (int i = 0; i < nativeArray.Length; i++)
-                {
-                    Entity entity = nativeArray[i];
-                    m_CommandBuffer.AddComponent<MovingAway>(unfilteredChunkIndex, entity);
-                    m_CommandBuffer.RemoveComponent<PropertySeeker>(unfilteredChunkIndex, entity);
                 }
             }
 
@@ -225,16 +250,7 @@ namespace ByeByeHomelessMod
 
         public override int GetUpdateInterval(SystemUpdatePhase phase)
         {
-            switch (Mod.Instance.Setting.TickInterval)
-            {
-                case TickIntervalOptions.M45:
-                    return 262144 / 32;
-                case TickIntervalOptions.M90:
-                default:
-                    return 262144 / 16;
-                case TickIntervalOptions.M180:
-                    return 262144 / 8;
-            }
+            return 262144 / 64;
         }
 
         protected override void OnCreate()
@@ -242,20 +258,22 @@ namespace ByeByeHomelessMod
             base.OnCreate();
             m_EndFrameBarrier = base.World.GetOrCreateSystemManaged<EndFrameBarrier>();
             m_CityStatisticsSystem = base.World.GetOrCreateSystemManaged<CityStatisticsSystem>();
-            m_HomelessGroup = GetEntityQuery(ComponentType.ReadOnly<Household>(), ComponentType.ReadOnly<HouseholdCitizen>(), ComponentType.Exclude<CommuterHousehold>(), ComponentType.Exclude<TouristHousehold>(), ComponentType.Exclude<PropertyRenter>(), ComponentType.Exclude<Deleted>(), ComponentType.Exclude<Temp>());
+            m_HomelessGroup = GetEntityQuery(ComponentType.ReadOnly<Household>(), ComponentType.ReadOnly<MovingAway>(), ComponentType.Exclude<CommuterHousehold>(), ComponentType.Exclude<TouristHousehold>(), ComponentType.Exclude<Deleted>(), ComponentType.Exclude<Temp>());
             RequireForUpdate(m_HomelessGroup);
         }
 
         protected override void OnUpdate()
         {
-            ByeByeHomelessJob byeByeHomelessJob;
-            byeByeHomelessJob.m_EntityType = SystemAPI.GetEntityTypeHandle();
-            byeByeHomelessJob.m_MovingAwayType = SystemAPI.GetComponentTypeHandle<MovingAway>(isReadOnly: true);
-            byeByeHomelessJob.m_Households = SystemAPI.GetComponentLookup<Household>(isReadOnly: true);
-            byeByeHomelessJob.m_HouseholdCitizenType = SystemAPI.GetBufferTypeHandle<HouseholdCitizen>(isReadOnly: true);
-            byeByeHomelessJob.m_CommandBuffer = m_EndFrameBarrier.CreateCommandBuffer().AsParallelWriter();
-            byeByeHomelessJob.actionDelete = Mod.Instance.Setting.ActionDelete;
-            byeByeHomelessJob.m_StatisticsQueue = m_CityStatisticsSystem.GetStatisticsEventQueue(out var deps).AsParallelWriter();
+            ByeByeHomelessJob byeByeHomelessJob = new ByeByeHomelessJob
+            {
+                m_EntityType = SystemAPI.GetEntityTypeHandle(),
+                m_HouseholdType = SystemAPI.GetComponentTypeHandle<Household>(isReadOnly: true),
+                m_HouseholdCitizenType = SystemAPI.GetBufferTypeHandle<HouseholdCitizen>(isReadOnly: true),
+                m_TravelPurposeLookup = SystemAPI.GetComponentLookup<TravelPurpose>(isReadOnly: true),
+                m_CurrentTransportLookup = SystemAPI.GetComponentLookup<CurrentTransport>(isReadOnly: true),
+                m_CommandBuffer = m_EndFrameBarrier.CreateCommandBuffer().AsParallelWriter(),
+                m_StatisticsQueue = m_CityStatisticsSystem.GetStatisticsEventQueue(out var deps).AsParallelWriter(),
+            };
             ByeByeHomelessJob jobData = byeByeHomelessJob;
             base.Dependency = JobChunkExtensions.ScheduleParallel(jobData, m_HomelessGroup, JobHandle.CombineDependencies(base.Dependency, deps));
             m_CityStatisticsSystem.AddWriter(base.Dependency);
