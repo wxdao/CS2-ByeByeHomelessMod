@@ -27,7 +27,7 @@ UPDATE 09-11: Added a Thanos Snap button in the settings to vanish all stuck hom
 	<!--Link to the forum post where the mod can be discussed-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/bye-bye-homeless.1694220/" />
 	<!--Version of the mod-->
-	<ModVersion Value="2.2.1" />
+	<ModVersion Value="2.2.2" />
 	<!--Recommended version of the base game to use the mod-->
 	<GameVersion Value="1.1.*" />
 	<!--Dependency for the mod, can be set multiple times-->

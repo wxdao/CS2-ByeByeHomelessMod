@@ -80,6 +80,7 @@ namespace ByeByeHomelessMod
             {
                 NotificationSystem.Push("BBH_UPDATE_NOTICE", Setting.GetSettingsLocaleID(), Setting.GetOptionDescLocaleID(nameof(Setting.ShowUpdateNotice20240911)), null, null, null, ProgressState.None, null, delegate
                 {
+                    Setting.ShowUpdateNotice20240911 = false;
                     NotificationSystem.Pop("BBH_UPDATE_NOTICE");
                 });
             }
