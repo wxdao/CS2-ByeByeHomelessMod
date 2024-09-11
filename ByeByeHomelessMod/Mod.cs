@@ -76,16 +76,11 @@ namespace ByeByeHomelessMod
 
             AssetDatabase.global.LoadSettings(nameof(Mod), Setting, new Setting(this));
 
-            if (Setting.ShowUpdateNotice20240909)
+            if (Setting.ShowUpdateNotice20240911)
             {
-                NotificationSystem.Push("BBH_UPDATE_NOTICE", "Bye Bye Homeless", "The mod has been updated and re-enabled. Click to learn more.", null, null, null, ProgressState.None, null, delegate
+                NotificationSystem.Push("BBH_UPDATE_NOTICE", Setting.GetSettingsLocaleID(), Setting.GetOptionDescLocaleID(nameof(Setting.ShowUpdateNotice20240911)), null, null, null, ProgressState.None, null, delegate
                 {
-                    var dialog = new MessageDialog("Bye Bye Homeless", "There used to be a bug where citizens moving in were prioritized over the homeless when assigning houses, but that got fixed with the 1.1.8f game update. Now homeless citizens still searching for a place can move into new homes if you zone more for them.\n\n\n\nHowever, testing has shown that in some cases, homeless citizens who had already decided to move away can still get stuck forever. The mod has been updated to help them break free from limbo.", "OK");
-                    GameManager.instance.userInterface.appBindings.ShowMessageDialog(dialog, delegate (int msg)
-                    {
-                        Setting.ShowUpdateNotice20240909 = false;
-                        NotificationSystem.Pop("BBH_UPDATE_NOTICE");
-                    });
+                    NotificationSystem.Pop("BBH_UPDATE_NOTICE");
                 });
             }
 
@@ -108,13 +103,23 @@ namespace ByeByeHomelessMod
         }
 
         [SettingsUIHidden]
-        public bool ShowUpdateNotice20240909 { get; set; }
+        public bool ShowUpdateNotice20240911 { get; set; }
+
+        [SettingsUIButton]
+        [SettingsUIConfirmation]
+        public bool ThanosSnap
+        {
+            set
+            {
+                World.DefaultGameObjectInjectionWorld?.GetOrCreateSystemManaged<ByeByeHomelessSystem>()?.DeleteAllStuckHomeless();
+            }
+        }
 
         public bool EvictExtraCompany { get; set; }
 
         public override void SetDefaults()
         {
-            ShowUpdateNotice20240909 = true;
+            ShowUpdateNotice20240911 = true;
             EvictExtraCompany = false;
         }
     }
@@ -133,9 +138,13 @@ namespace ByeByeHomelessMod
             return new Dictionary<string, string>
             {
                 { _mSetting.GetSettingsLocaleID(), "Bye Bye Homeless" },
+                { _mSetting.GetOptionLabelLocaleID(nameof(Setting.ThanosSnap)), "Thanos Snap" },
+                { _mSetting.GetOptionDescLocaleID(nameof(Setting.ThanosSnap)), "Vanish all stuck homeless." },
+                { _mSetting.GetOptionWarningLocaleID(nameof(Setting.ThanosSnap)), "For the greater good, right?" },
                 { _mSetting.GetOptionLabelLocaleID(nameof(Setting.EvictExtraCompany)), "Evict Ghost Companies" },
                 { _mSetting.GetOptionDescLocaleID(nameof(Setting.EvictExtraCompany)), "[EXPERIMENTAL] When checked, companies without factories or offices will be evicted." },
-            };
+                { _mSetting.GetOptionDescLocaleID(nameof(Setting.ShowUpdateNotice20240911)), "In case you don't know: a button is added to remove all stuck homeless at once." },
+           };
         }
 
         public void Unload()
@@ -347,6 +356,12 @@ namespace ByeByeHomelessMod
             base.Dependency = JobChunkExtensions.ScheduleParallel(jobData, m_HomelessGroup, JobHandle.CombineDependencies(base.Dependency, deps));
             m_CityStatisticsSystem.AddWriter(base.Dependency);
             m_EndFrameBarrier.AddJobHandleForProducer(base.Dependency);
+        }
+
+        public void DeleteAllStuckHomeless()
+        {
+            EntityQuery entityQuery = base.EntityManager.CreateEntityQuery(ComponentType.ReadOnly<Household>(), ComponentType.Exclude<PropertyRenter>(), ComponentType.Exclude<CommuterHousehold>(), ComponentType.Exclude<TouristHousehold>(), ComponentType.Exclude<Deleted>(), ComponentType.Exclude<Temp>());
+            base.EntityManager.AddComponent<Deleted>(entityQuery);
         }
 
         public ByeByeHomelessSystem()

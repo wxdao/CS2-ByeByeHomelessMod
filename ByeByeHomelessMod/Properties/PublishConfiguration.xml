@@ -14,6 +14,8 @@ There used to be a bug where citizens moving in were prioritized over the homele
 However, testing has shown that in some cases, homeless citizens who had already decided to move away can still get stuck forever. The mod has been updated to help them break free from limbo.
 
 UPDATE 09-10: The active eviction is back! If a homeless household fails to find a new home within 60 in-game minutes, they will be forced to move out of your city.
+
+UPDATE 09-11: Added a Thanos Snap button in the settings to vanish all stuck homeless at once.
 	</LongDescription>
 	<!--Thumbnail-->
 	<Thumbnail Value="Properties/Thumbnail.png" />
@@ -25,15 +27,16 @@ UPDATE 09-10: The active eviction is back! If a homeless household fails to find
 	<!--Link to the forum post where the mod can be discussed-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/bye-bye-homeless.1694220/" />
 	<!--Version of the mod-->
-	<ModVersion Value="2.1.0" />
+	<ModVersion Value="2.2.1" />
 	<!--Recommended version of the base game to use the mod-->
 	<GameVersion Value="1.1.*" />
 	<!--Dependency for the mod, can be set multiple times-->
 	<Dependency Id="" />
 	<!--Change log for new version. Single line or multi line. Supports minimal markdown subset-->
 	<ChangeLog>
-- Updated for 1.1.8f.
-- The active eviction is back with a better implementation.
+- Updated for 1.1.8f. (2.0.0)
+- The active eviction is back with a better implementation. (2.1.0)
+- Add Thanos Snap button. (2.2.0)
 	</ChangeLog>
 	<!--External link. supported types are discord, github, youtube, twitch, x, paypal, patreon, buymeacoffee, kofi, crowdin, gitlab-->
 	<ExternalLink Type="github" Url="https://github.com/wxdao/CS2-ByeByeHomelessMod" />
