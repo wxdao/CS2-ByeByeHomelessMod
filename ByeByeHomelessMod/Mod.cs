@@ -32,6 +32,7 @@ using Game.Companies;
 using Game.PSI;
 using Colossal.PSI.Common;
 using Colossal.Entities;
+using Colossal.Serialization.Entities;
 
 namespace ByeByeHomelessMod
 {
@@ -109,22 +110,12 @@ namespace ByeByeHomelessMod
         [SettingsUIHidden]
         public bool ShowUpdateNotice20240909 { get; set; }
 
-        public enum TickIntervalOptions
-        {
-            M45,
-            M90,
-            M180,
-        }
-
         public bool EvictExtraCompany { get; set; }
-
-        public TickIntervalOptions DeleteExtraCompanyTickInterval { get; set; }
 
         public override void SetDefaults()
         {
             ShowUpdateNotice20240909 = true;
             EvictExtraCompany = false;
-            DeleteExtraCompanyTickInterval = TickIntervalOptions.M90;
         }
     }
 
@@ -144,11 +135,6 @@ namespace ByeByeHomelessMod
                 { _mSetting.GetSettingsLocaleID(), "Bye Bye Homeless" },
                 { _mSetting.GetOptionLabelLocaleID(nameof(Setting.EvictExtraCompany)), "Evict Ghost Companies" },
                 { _mSetting.GetOptionDescLocaleID(nameof(Setting.EvictExtraCompany)), "[EXPERIMENTAL] When checked, companies without factories or offices will be evicted." },
-                { _mSetting.GetOptionLabelLocaleID(nameof(Setting.DeleteExtraCompanyTickInterval)), "Ghost Companies Eviction Period" },
-                { _mSetting.GetOptionDescLocaleID(nameof(Setting.DeleteExtraCompanyTickInterval)), "The maximum amount of time the company have to find a property before being evicted. Requires a restart to take effect." },
-                { _mSetting.GetEnumValueLocaleID(TickIntervalOptions.M45), "45 in-game minutes" },
-                { _mSetting.GetEnumValueLocaleID(TickIntervalOptions.M90), "90 in-game minutes" },
-                { _mSetting.GetEnumValueLocaleID(TickIntervalOptions.M180), "180 in-game minutes" },
             };
         }
 
@@ -156,6 +142,22 @@ namespace ByeByeHomelessMod
         {
         }
     }
+
+    public struct FindPropertyTimeout : IComponentData, IQueryTypeParameter, ISerializable
+    {
+        public uint m_SimulationFrame;
+
+        public void Serialize<TWriter>(TWriter writer) where TWriter : IWriter
+        {
+            writer.Write(m_SimulationFrame);
+        }
+
+        public void Deserialize<TReader>(TReader reader) where TReader : IReader
+        {
+            reader.Read(out m_SimulationFrame);
+        }
+    }
+
 
     public partial class ByeByeHomelessSystem : GameSystemBase
     {
@@ -167,6 +169,15 @@ namespace ByeByeHomelessMod
 
             [ReadOnly]
             public ComponentTypeHandle<Household> m_HouseholdType;
+
+            [ReadOnly]
+            public ComponentTypeHandle<MovingAway> m_MovingAwayType;
+
+            [ReadOnly]
+            public ComponentTypeHandle<FindPropertyTimeout> m_FindPropertyTimeoutType;
+
+            [ReadOnly]
+            public ComponentTypeHandle<PropertyRenter> m_PropertyRenterType;
 
             [ReadOnly]
             public BufferTypeHandle<HouseholdCitizen> m_HouseholdCitizenType;
@@ -181,57 +192,108 @@ namespace ByeByeHomelessMod
 
             public NativeQueue<StatisticsEvent>.ParallelWriter m_StatisticsQueue;
 
+            public uint m_SimulationFrame;
+
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                NativeArray<Entity> entities = chunk.GetNativeArray(m_EntityType);
-                NativeArray<Household> households = chunk.GetNativeArray(ref m_HouseholdType);
-                BufferAccessor<HouseholdCitizen> householdCitizensBuffer = chunk.GetBufferAccessor(ref m_HouseholdCitizenType);
+                NativeArray<Entity> entityArray = chunk.GetNativeArray(m_EntityType);
+                NativeArray<Household> householdArray = chunk.GetNativeArray(ref m_HouseholdType);
+                BufferAccessor<HouseholdCitizen> householdCitizensBufferArray = chunk.GetBufferAccessor(ref m_HouseholdCitizenType);
 
-                for (int i = 0; i < households.Length; i++)
+                NativeArray<MovingAway> movingAwayArray = chunk.GetNativeArray(ref m_MovingAwayType);
+                bool hasMovingAway = movingAwayArray.Length > 0;
+
+                NativeArray<FindPropertyTimeout> findPropertyTimeoutArray = chunk.GetNativeArray(ref m_FindPropertyTimeoutType);
+                bool hasFindPropertyTimeout = findPropertyTimeoutArray.Length > 0;
+
+                NativeArray<PropertyRenter> propertyRenterArray = chunk.GetNativeArray(ref m_PropertyRenterType);
+                bool hasPropertyRenter = propertyRenterArray.Length > 0;
+
+                if (hasFindPropertyTimeout && (hasMovingAway || hasPropertyRenter))
                 {
-                    Entity entity = entities[i];
-                    Household household = households[i];
-
-                    if (householdCitizensBuffer.Length == 0)
+                    for (int i = 0; i < entityArray.Length; i++)
                     {
-                        m_CommandBuffer.AddComponent(unfilteredChunkIndex, entity, default(Deleted));
-                        return;
+                        m_CommandBuffer.RemoveComponent<FindPropertyTimeout>(unfilteredChunkIndex, entityArray[i]);
                     }
-                    DynamicBuffer<HouseholdCitizen> householdCitizens = householdCitizensBuffer[i];
-                    if (householdCitizens.Length == 0)
-                    {
-                        m_CommandBuffer.AddComponent(unfilteredChunkIndex, entity, default(Deleted));
-                        return;
-                    }
+                    return;
+                }
 
-                    for (int j = 0; j < householdCitizens.Length; j++)
+                if (hasMovingAway)
+                {
+                    for (int i = 0; i < entityArray.Length; i++)
                     {
-                        Entity citizen = householdCitizens[j].m_Citizen;
+                        Entity entity = entityArray[i];
+                        Household household = householdArray[i];
 
-                        if (!m_CurrentTransportLookup.TryGetComponent(citizen, out var currentTransport))
+                        if (householdCitizensBufferArray.Length == 0)
                         {
-                            m_StatisticsQueue.Enqueue(new StatisticsEvent
-                            {
-                                m_Statistic = StatisticType.CitizensMovedAway,
-                                m_Change = 1
-                            });
-                            m_CommandBuffer.AddComponent(unfilteredChunkIndex, citizen, default(Deleted));
-                            continue;
+                            m_CommandBuffer.AddComponent(unfilteredChunkIndex, entity, default(Deleted));
+                            return;
+                        }
+                        DynamicBuffer<HouseholdCitizen> householdCitizens = householdCitizensBufferArray[i];
+                        if (householdCitizens.Length == 0)
+                        {
+                            m_CommandBuffer.AddComponent(unfilteredChunkIndex, entity, default(Deleted));
+                            return;
                         }
 
-                        if (!m_TravelPurposeLookup.TryGetComponent(citizen, out var travelPurpose) || travelPurpose.m_Purpose != Purpose.MovingAway)
+                        for (int j = 0; j < householdCitizens.Length; j++)
                         {
-                            m_CommandBuffer.AddComponent(unfilteredChunkIndex, citizen, new TravelPurpose
+                            Entity citizen = householdCitizens[j].m_Citizen;
+
+                            if (!m_CurrentTransportLookup.TryGetComponent(citizen, out var currentTransport))
                             {
-                                m_Purpose = Purpose.MovingAway,
-                            });
-                            m_CommandBuffer.AddComponent(unfilteredChunkIndex, currentTransport.m_CurrentTransport, new Target
+                                m_StatisticsQueue.Enqueue(new StatisticsEvent
+                                {
+                                    m_Statistic = StatisticType.CitizensMovedAway,
+                                    m_Change = 1
+                                });
+                                m_CommandBuffer.AddComponent(unfilteredChunkIndex, citizen, default(Deleted));
+                                continue;
+                            }
+
+                            if (!m_TravelPurposeLookup.TryGetComponent(citizen, out var travelPurpose) || travelPurpose.m_Purpose != Game.Citizens.Purpose.MovingAway)
                             {
-                                m_Target = Entity.Null,
-                            });
-                            continue;
+                                m_CommandBuffer.AddComponent(unfilteredChunkIndex, citizen, new TravelPurpose
+                                {
+                                    m_Purpose = Game.Citizens.Purpose.MovingAway,
+                                });
+                                m_CommandBuffer.AddComponent(unfilteredChunkIndex, currentTransport.m_CurrentTransport, new Target
+                                {
+                                    m_Target = Entity.Null,
+                                });
+                                continue;
+                            }
                         }
                     }
+                    return;
+                }
+
+                if (!hasPropertyRenter && !hasFindPropertyTimeout)
+                {
+                    for (int i = 0; i < entityArray.Length; i++)
+                    {
+                        m_CommandBuffer.AddComponent(unfilteredChunkIndex, entityArray[i], new FindPropertyTimeout
+                        {
+                            m_SimulationFrame = m_SimulationFrame
+                        });
+                    }
+                    return;
+                }
+
+                if (!hasPropertyRenter && hasFindPropertyTimeout)
+                {
+                    for (int i = 0; i < entityArray.Length; i++)
+                    {
+                        FindPropertyTimeout findPropertyTimeout = findPropertyTimeoutArray[i];
+                        if (m_SimulationFrame - findPropertyTimeout.m_SimulationFrame >= 10000)
+                        {
+                            m_CommandBuffer.AddComponent<MovingAway>(unfilteredChunkIndex, entityArray[i]);
+                            m_CommandBuffer.RemoveComponent<PropertySeeker>(unfilteredChunkIndex, entityArray[i]);
+                        }
+                    }
+                    return;
+
                 }
             }
 
@@ -248,6 +310,8 @@ namespace ByeByeHomelessMod
 
         private CityStatisticsSystem m_CityStatisticsSystem;
 
+        private SimulationSystem m_SimulationSystem;
+
         public override int GetUpdateInterval(SystemUpdatePhase phase)
         {
             return 262144 / 64;
@@ -258,7 +322,8 @@ namespace ByeByeHomelessMod
             base.OnCreate();
             m_EndFrameBarrier = base.World.GetOrCreateSystemManaged<EndFrameBarrier>();
             m_CityStatisticsSystem = base.World.GetOrCreateSystemManaged<CityStatisticsSystem>();
-            m_HomelessGroup = GetEntityQuery(ComponentType.ReadOnly<Household>(), ComponentType.ReadOnly<MovingAway>(), ComponentType.Exclude<CommuterHousehold>(), ComponentType.Exclude<TouristHousehold>(), ComponentType.Exclude<Deleted>(), ComponentType.Exclude<Temp>());
+            m_SimulationSystem = base.World.GetOrCreateSystemManaged<SimulationSystem>();
+            m_HomelessGroup = GetEntityQuery(ComponentType.ReadOnly<Household>(), ComponentType.Exclude<CommuterHousehold>(), ComponentType.Exclude<TouristHousehold>(), ComponentType.Exclude<Deleted>(), ComponentType.Exclude<Temp>());
             RequireForUpdate(m_HomelessGroup);
         }
 
@@ -268,11 +333,15 @@ namespace ByeByeHomelessMod
             {
                 m_EntityType = SystemAPI.GetEntityTypeHandle(),
                 m_HouseholdType = SystemAPI.GetComponentTypeHandle<Household>(isReadOnly: true),
+                m_MovingAwayType = SystemAPI.GetComponentTypeHandle<MovingAway>(isReadOnly: true),
+                m_PropertyRenterType = SystemAPI.GetComponentTypeHandle<PropertyRenter>(isReadOnly: true),
+                m_FindPropertyTimeoutType = SystemAPI.GetComponentTypeHandle<FindPropertyTimeout>(isReadOnly: true),
                 m_HouseholdCitizenType = SystemAPI.GetBufferTypeHandle<HouseholdCitizen>(isReadOnly: true),
                 m_TravelPurposeLookup = SystemAPI.GetComponentLookup<TravelPurpose>(isReadOnly: true),
                 m_CurrentTransportLookup = SystemAPI.GetComponentLookup<CurrentTransport>(isReadOnly: true),
                 m_CommandBuffer = m_EndFrameBarrier.CreateCommandBuffer().AsParallelWriter(),
                 m_StatisticsQueue = m_CityStatisticsSystem.GetStatisticsEventQueue(out var deps).AsParallelWriter(),
+                m_SimulationFrame = m_SimulationSystem.frameIndex,
             };
             ByeByeHomelessJob jobData = byeByeHomelessJob;
             base.Dependency = JobChunkExtensions.ScheduleParallel(jobData, m_HomelessGroup, JobHandle.CombineDependencies(base.Dependency, deps));
@@ -317,16 +386,7 @@ namespace ByeByeHomelessMod
 
         public override int GetUpdateInterval(SystemUpdatePhase phase)
         {
-            switch (Mod.Instance.Setting.DeleteExtraCompanyTickInterval)
-            {
-                case TickIntervalOptions.M45:
-                    return 262144 / 32;
-                case TickIntervalOptions.M90:
-                default:
-                    return 262144 / 16;
-                case TickIntervalOptions.M180:
-                    return 262144 / 8;
-            }
+            return 262144 / 32;
         }
 
         protected override void OnCreate()

@@ -12,19 +12,20 @@
 There used to be a bug where citizens moving in were prioritized over the homeless when assigning houses, but that got fixed with the 1.1.8f game update. Now homeless citizens still searching for a place can move into new homes if you build more for them.
 
 However, testing has shown that in some cases, homeless citizens who had already decided to move away can still get stuck forever. The mod has been updated to help them break free from limbo.
+
+UPDATE 09-10: The active eviction is back! If a homeless household fails to find a new home within 60 in-game minutes, they will be forced to move out of your city.
 	</LongDescription>
 	<!--Thumbnail-->
 	<Thumbnail Value="Properties/Thumbnail.png" />
 	<!--Screenshot, can be set multiple times-->
 	<Screenshot Value="Properties/Screenshot02.png" />
 	<Screenshot Value="Properties/Screenshot03.png" />
-	<Screenshot Value="Properties/Screenshot01.png" />
 	<!--Tag, can be set multiple times-->
 	<Tag Value="" />
 	<!--Link to the forum post where the mod can be discussed-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/bye-bye-homeless.1694220/" />
 	<!--Version of the mod-->
-	<ModVersion Value="2.0.1" />
+	<ModVersion Value="2.1.0" />
 	<!--Recommended version of the base game to use the mod-->
 	<GameVersion Value="1.1.*" />
 	<!--Dependency for the mod, can be set multiple times-->
@@ -32,9 +33,10 @@ However, testing has shown that in some cases, homeless citizens who had already
 	<!--Change log for new version. Single line or multi line. Supports minimal markdown subset-->
 	<ChangeLog>
 - Updated for 1.1.8f.
-- Same version as 2.0.0, just forgot to update the changelog.
+- The active eviction is back with a better implementation.
 	</ChangeLog>
 	<!--External link. supported types are discord, github, youtube, twitch, x, paypal, patreon, buymeacoffee, kofi, crowdin, gitlab-->
 	<ExternalLink Type="github" Url="https://github.com/wxdao/CS2-ByeByeHomelessMod" />
 	<ExternalLink Type="discord" Url="https://discord.gg/HTav7ARPs2" />
+	<ExternalLink Type="buymeacoffee" Url="https://buymeacoffee.com/mixzhh7rqu" />
 </Publish>
