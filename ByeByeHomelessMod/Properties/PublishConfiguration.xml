@@ -11,6 +11,10 @@
 
 The mod adjusts the game logic to minimize instances where citizens become permanently homeless.
 
+There are bugs in the game:
+- Only a specific group of citizens (always the same ones) can look for houses. If this group can't find housing, the others never get a chance, resulting them forever stuck on the streets.
+- Although parks have a set homeless capacity, they can actually hold an unlimited number of homeless citizens.
+
 For first-time installations or if you suspect problems with homelessness later on, use the remove-homeless buttons in the settings to clear homeless citizens.
 	</LongDescription>
 	<!--Thumbnail-->
@@ -23,7 +27,7 @@ For first-time installations or if you suspect problems with homelessness later 
 	<!--Link to the forum post where the mod can be discussed-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/bye-bye-homeless.1694220/" />
 	<!--Version of the mod-->
-	<ModVersion Value="3.1.0" />
+	<ModVersion Value="3.2.0" />
 	<!--Recommended version of the base game to use the mod-->
 	<GameVersion Value="1.1.*" />
 	<!--Dependency for the mod, can be set multiple times-->
@@ -32,6 +36,7 @@ For first-time installations or if you suspect problems with homelessness later 
 	<ChangeLog>
 - Updated for 1.1.11f. (3.0.0)
 - Re-enable FindPropertyTimeout. (3.1.0)
+- Parks no longer hold an unlimited number of homeless citizens. (3.2.0)
 	</ChangeLog>
 	<!--External link. supported types are discord, github, youtube, twitch, x, paypal, patreon, buymeacoffee, kofi, crowdin, gitlab-->
 	<ExternalLink Type="github" Url="https://github.com/wxdao/CS2-ByeByeHomelessMod" />
