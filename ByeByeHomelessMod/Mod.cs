@@ -40,6 +40,7 @@ using static Game.Simulation.HouseholdFindPropertySystem;
 using Colossal.Localization;
 using static Game.Buildings.PropertyUtils;
 using Game.Notifications;
+using UnityEngine.Rendering;
 
 namespace ByeByeHomelessMod
 {
@@ -67,9 +68,9 @@ namespace ByeByeHomelessMod
             log.Info($"Game version: {Game.Version.current.shortVersion}");
             if (Game.Version.current.shortVersion != "1.1.11f1")
             {
-                NotificationSystem.Push("BBH_VERSION_NOTICE", "Bye Bye Homeless", "The mod is disabled due to unsupported game version.", null, null, null, ProgressState.Warning, null, delegate
+                NotificationSystem.Push("BBH_VERSION_NOTICE", "Bye Bye Homeless", "The mod is disabled due to unsupported game version.", null, null, null, ProgressState.None, null, delegate
                 {
-                    var dialog = new MessageDialog("Bye Bye Homeless", "The mod has been automatically shut down to avoid compatibility issues. Stay tuned for further updates.", "OK");
+                    var dialog = new MessageDialog("Bye Bye Homeless", "The mod has shut itself down to avoid compatibility issues. Stay tuned for further updates.\n\nIn the meantime it's safe to keep it subscribed.", "OK");
                     GameManager.instance.userInterface.appBindings.ShowMessageDialog(dialog, delegate (int msg)
                     {
                         NotificationSystem.Pop("BBH_VERSION_NOTICE");
@@ -122,6 +123,18 @@ namespace ByeByeHomelessMod
         [SettingsUIHidden]
         public bool ShowUpdateNotice20241110 { get; set; }
 
+
+        public bool ApplyHomelessnessFix
+        {
+            get
+            {
+                return true;
+            }
+            set
+            {
+            }
+        }
+
         [SettingsUIButton]
         public bool DeportHomeless
         {
@@ -172,13 +185,15 @@ namespace ByeByeHomelessMod
             return new Dictionary<string, string>
             {
                 { _mSetting.GetSettingsLocaleID(), "Bye Bye Homeless" },
-                { _mSetting.GetOptionLabelLocaleID(nameof(Setting.DeportHomeless)), "Deport homeless" },
+                { _mSetting.GetOptionLabelLocaleID(nameof(Setting.ApplyHomelessnessFix)), "Apply homelessness bug fix" },
+                { _mSetting.GetOptionDescLocaleID(nameof(Setting.ApplyHomelessnessFix)), "This is an indicator that the homelessness bug fix is applied." },
+                { _mSetting.GetOptionLabelLocaleID(nameof(Setting.DeportHomeless)), "Deport Homeless" },
                 { _mSetting.GetOptionDescLocaleID(nameof(Setting.DeportHomeless)), "Visa canceled! Let the campers in your parks find a way to leave the city right now." },
-                { _mSetting.GetOptionLabelLocaleID(nameof(Setting.RemoveStuckHomeless)), "Remove stuck homeless" },
+                { _mSetting.GetOptionLabelLocaleID(nameof(Setting.RemoveStuckHomeless)), "Remove tuck homeless" },
                 { _mSetting.GetOptionDescLocaleID(nameof(Setting.RemoveStuckHomeless)), "Instantly remove homeless citizens stuck on the streets, those in parks NOT included." },
                 { _mSetting.GetOptionLabelLocaleID(nameof(Setting.RemoveAllHomeless)), "Remove all homeless" },
                 { _mSetting.GetOptionDescLocaleID(nameof(Setting.RemoveAllHomeless)), "Instantly remove all homeless citizens, including those in parks." },
-                { _mSetting.GetOptionLabelLocaleID(nameof(Setting.EvictExtraCompany)), "Evict Ghost Companies" },
+                { _mSetting.GetOptionLabelLocaleID(nameof(Setting.EvictExtraCompany)), "Evict ghost companies" },
                 { _mSetting.GetOptionDescLocaleID(nameof(Setting.EvictExtraCompany)), "[EXPERIMENTAL] When checked, companies without factories or offices will be evicted." },
            };
         }
@@ -260,7 +275,7 @@ namespace ByeByeHomelessMod
                 NativeArray<PropertyRenter> propertyRenterArray = chunk.GetNativeArray(ref m_PropertyRenterType);
                 bool hasPropertyRenter = propertyRenterArray.Length > 0;
 
-                if (hasFindPropertyTimeout && (hasHomelessHousehold || hasMovingAway || hasPropertyRenter))
+                if (hasFindPropertyTimeout && (hasMovingAway || hasPropertyRenter))
                 {
                     for (int i = 0; i < entityArray.Length; i++)
                     {
@@ -288,26 +303,26 @@ namespace ByeByeHomelessMod
                             return;
                         }
 
-                        for (int j = 0; j < householdCitizens.Length; j++)
-                        {
-                            Entity citizen = householdCitizens[j].m_Citizen;
+                        //for (int j = 0; j < householdCitizens.Length; j++)
+                        //{
+                        //    Entity citizen = householdCitizens[j].m_Citizen;
 
-                            if (!m_CurrentTransportLookup.TryGetComponent(citizen, out var currentTransport))
-                            {
-                                m_StatisticsQueue.Enqueue(new StatisticsEvent
-                                {
-                                    m_Statistic = StatisticType.CitizensMovedAway,
-                                    m_Change = 1
-                                });
-                                m_CommandBuffer.AddComponent(unfilteredChunkIndex, citizen, default(Deleted));
-                                continue;
-                            }
-                        }
+                        //    if (!m_CurrentTransportLookup.TryGetComponent(citizen, out var currentTransport))
+                        //    {
+                        //        m_StatisticsQueue.Enqueue(new StatisticsEvent
+                        //        {
+                        //            m_Statistic = StatisticType.CitizensMovedAway,
+                        //            m_Change = 1
+                        //        });
+                        //        m_CommandBuffer.AddComponent(unfilteredChunkIndex, citizen, default(Deleted));
+                        //        continue;
+                        //    }
+                        //}
                     }
                     return;
                 }
 
-                if (!hasHomelessHousehold && !hasPropertyRenter && !hasFindPropertyTimeout)
+                if (!hasPropertyRenter && !hasMovingAway && !hasFindPropertyTimeout)
                 {
                     for (int i = 0; i < entityArray.Length; i++)
                     {
@@ -319,15 +334,16 @@ namespace ByeByeHomelessMod
                     return;
                 }
 
-                if (!hasHomelessHousehold && !hasPropertyRenter && hasFindPropertyTimeout)
+                if (!hasPropertyRenter && !hasMovingAway && hasFindPropertyTimeout)
                 {
                     for (int i = 0; i < entityArray.Length; i++)
                     {
                         FindPropertyTimeout findPropertyTimeout = findPropertyTimeoutArray[i];
-                        if (m_SimulationFrame - findPropertyTimeout.m_SimulationFrame >= 10000)
+                        if (m_SimulationFrame - findPropertyTimeout.m_SimulationFrame >= 262144 /* one day (or month) */)
                         {
                             m_CommandBuffer.AddComponent<MovingAway>(unfilteredChunkIndex, entityArray[i]);
                             m_CommandBuffer.RemoveComponent<PropertySeeker>(unfilteredChunkIndex, entityArray[i]);
+                            m_CommandBuffer.RemoveComponent<HomelessHousehold>(unfilteredChunkIndex, entityArray[i]);
                         }
                     }
                     return;
@@ -352,7 +368,7 @@ namespace ByeByeHomelessMod
 
         public override int GetUpdateInterval(SystemUpdatePhase phase)
         {
-            return 262144 / 64;
+            return 262144 / 16;
         }
 
         protected override void OnCreate()
@@ -393,6 +409,8 @@ namespace ByeByeHomelessMod
             var query = EntityManager.CreateEntityQuery(ComponentType.ReadOnly<HomelessHousehold>(), ComponentType.Exclude<MovingAway>(), ComponentType.Exclude<Deleted>(), ComponentType.Exclude<Temp>());
             base.EntityManager.AddComponent<MovingAway>(query);
             base.EntityManager.RemoveComponent<PropertySeeker>(query);
+            base.EntityManager.RemoveComponent<HomelessHousehold>(query);
+
         }
 
         public void DeleteStuckHomeless()
@@ -898,10 +916,11 @@ namespace ByeByeHomelessMod
 
             public void Execute()
             {
-                Unity.Mathematics.Random random = m_RandomSeed.GetRandom(0);
-                for (int i = 0; i < math.min(kMaxProcessEntitiesPerUpdate, m_Entities.Length); i++)
+                var random = m_RandomSeed.GetRandom(0);
+                var startIndex = random.NextInt(m_Entities.Length);
+                for (int i = startIndex; i < math.min(kMaxProcessEntitiesPerUpdate, m_Entities.Length - startIndex); i++)
                 {
-                    Entity entity = m_Entities[random.NextInt(m_Entities.Length)];
+                    Entity entity = m_Entities[i];
                     DynamicBuffer<HouseholdCitizen> householdCitizenBuffer = m_CitizenBuffers[entity];
                     if (householdCitizenBuffer.Length == 0)
                     {
