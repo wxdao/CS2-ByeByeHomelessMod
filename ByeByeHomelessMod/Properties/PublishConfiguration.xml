@@ -17,6 +17,9 @@ There are bugs in the game:
 - Campers can stay in the parks as long as they wish.
 
 For first-time installations or if you suspect problems with homelessness later on, use the remove-homeless buttons in the settings to clear homeless citizens.
+
+NOT updated for 1.1.12f yet.
+
 	</LongDescription>
 	<!--Thumbnail-->
 	<Thumbnail Value="Properties/Thumbnail.png" />
@@ -28,17 +31,19 @@ For first-time installations or if you suspect problems with homelessness later 
 	<!--Link to the forum post where the mod can be discussed-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/bye-bye-homeless.1694220/" />
 	<!--Version of the mod-->
-	<ModVersion Value="3.3.0" />
+	<ModVersion Value="3.4.1" />
 	<!--Recommended version of the base game to use the mod-->
 	<GameVersion Value="1.1.*" />
 	<!--Dependency for the mod, can be set multiple times-->
 	<Dependency Id="" />
 	<!--Change log for new version. Single line or multi line. Supports minimal markdown subset-->
 	<ChangeLog>
-- Updated for 1.1.11f. (3.0.0)
-- Re-enable FindPropertyTimeout. (3.1.0)
-- Parks no longer hold an unlimited number of homeless citizens. (3.2.0)
+- Quick tweak to not fail on load on 1.1.12f, but the function is disabled until further update. (3.4.1)
+- Revert some changes. (3.4.0)
 - Campers have one month to find housing or they will be kicked out. (3.3.0)
+- Parks no longer hold an unlimited number of homeless citizens. (3.2.0)
+- Re-enable FindPropertyTimeout. (3.1.0)
+- Updated for 1.1.11f. (3.0.0)
 	</ChangeLog>
 	<!--External link. supported types are discord, github, youtube, twitch, x, paypal, patreon, buymeacoffee, kofi, crowdin, gitlab-->
 	<ExternalLink Type="github" Url="https://github.com/wxdao/CS2-ByeByeHomelessMod" />

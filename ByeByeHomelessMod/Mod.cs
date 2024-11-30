@@ -66,7 +66,7 @@ namespace ByeByeHomelessMod
             GameManager.instance.localizationManager.AddSource("en-US", new LocaleEN(Setting));
 
             log.Info($"Game version: {Game.Version.current.shortVersion}");
-            if (Game.Version.current.shortVersion != "1.1.11f1")
+            if (Game.Version.current.shortVersion != "1.1.12f1")
             {
                 NotificationSystem.Push("BBH_VERSION_NOTICE", "Bye Bye Homeless", "The mod is disabled due to unsupported game version.", null, null, null, ProgressState.None, null, delegate
                 {
@@ -84,15 +84,15 @@ namespace ByeByeHomelessMod
 
             AssetDatabase.global.LoadSettings(nameof(Mod), Setting, new Setting(this));
 
-            if (Setting.ShowUpdateNotice20241110)
+            if (Setting.ShowUpdateNotice20241130)
             {
-                NotificationSystem.Push("BBH_UPDATE_NOTICE_20241110", "Bye Bye Homeless", "The mod is updated for game version 1.1.11f. Click to learn more.", null, null, null, ProgressState.None, null, delegate
+                NotificationSystem.Push("BBH_UPDATE_NOTICE_20241130", "Bye Bye Homeless", "The mod is updated for game version 1.1.12f. Click to learn more.", null, null, null, ProgressState.None, null, delegate
                 {
                     var dialog = new MessageDialog("Bye Bye Homeless", "The mod adjusts the game logic to minimize instances where citizens become permanently homeless.\n\nFor first-time installations or if you suspect problems with homelessness later on, use the remove-homeless buttons in the settings to clear homeless citizens.", "OK");
                     GameManager.instance.userInterface.appBindings.ShowMessageDialog(dialog, null);
 
-                    Setting.ShowUpdateNotice20241110 = false;
-                    NotificationSystem.Pop("BBH_UPDATE_NOTICE_20241110");
+                    Setting.ShowUpdateNotice20241130 = false;
+                    NotificationSystem.Pop("BBH_UPDATE_NOTICE_20241130");
                 });
             }
 
@@ -121,7 +121,7 @@ namespace ByeByeHomelessMod
         }
 
         [SettingsUIHidden]
-        public bool ShowUpdateNotice20241110 { get; set; }
+        public bool ShowUpdateNotice20241130 { get; set; }
 
 
         public bool ApplyHomelessnessFix
@@ -143,6 +143,15 @@ namespace ByeByeHomelessMod
                 World.DefaultGameObjectInjectionWorld?.GetOrCreateSystemManaged<ByeByeHomelessSystem>()?.DeportHomeless();
             }
         }
+
+        //[SettingsUIButton]
+        //public bool ArrestHomeless
+        //{
+        //    set
+        //    {
+        //        World.DefaultGameObjectInjectionWorld?.GetOrCreateSystemManaged<ByeByeHomelessSystem>()?.ArrestHomeless();
+        //    }
+        //}
 
         [SettingsUIButton]
         public bool RemoveStuckHomeless
@@ -166,7 +175,7 @@ namespace ByeByeHomelessMod
 
         public override void SetDefaults()
         {
-            ShowUpdateNotice20241110 = true;
+            ShowUpdateNotice20241130 = true;
             EvictExtraCompany = false;
         }
     }
@@ -189,7 +198,9 @@ namespace ByeByeHomelessMod
                 { _mSetting.GetOptionDescLocaleID(nameof(Setting.ApplyHomelessnessFix)), "This is an indicator that the homelessness bug fix is applied." },
                 { _mSetting.GetOptionLabelLocaleID(nameof(Setting.DeportHomeless)), "Deport Homeless" },
                 { _mSetting.GetOptionDescLocaleID(nameof(Setting.DeportHomeless)), "Visa canceled! Let the campers in your parks find a way to leave the city right now." },
-                { _mSetting.GetOptionLabelLocaleID(nameof(Setting.RemoveStuckHomeless)), "Remove tuck homeless" },
+                //{ _mSetting.GetOptionLabelLocaleID(nameof(Setting.ArrestHomeless)), "Arrest Homeless" },
+                //{ _mSetting.GetOptionDescLocaleID(nameof(Setting.ArrestHomeless)), "Send out cops to arrest the campers in your parks." },
+                { _mSetting.GetOptionLabelLocaleID(nameof(Setting.RemoveStuckHomeless)), "Remove stuck homeless" },
                 { _mSetting.GetOptionDescLocaleID(nameof(Setting.RemoveStuckHomeless)), "Instantly remove homeless citizens stuck on the streets, those in parks NOT included." },
                 { _mSetting.GetOptionLabelLocaleID(nameof(Setting.RemoveAllHomeless)), "Remove all homeless" },
                 { _mSetting.GetOptionDescLocaleID(nameof(Setting.RemoveAllHomeless)), "Instantly remove all homeless citizens, including those in parks." },
@@ -412,6 +423,27 @@ namespace ByeByeHomelessMod
             base.EntityManager.RemoveComponent<HomelessHousehold>(query);
 
         }
+
+        //public void ArrestHomeless()
+        //{
+        //    var query = EntityManager.CreateEntityQuery(ComponentType.ReadOnly<HomelessHousehold>(), ComponentType.ReadOnly<HouseholdCitizen>(), ComponentType.Exclude<MovingAway>(), ComponentType.Exclude<Deleted>(), ComponentType.Exclude<Temp>());
+        //    var homelessHouseholds = query.ToEntityArray(Allocator.TempJob);
+        //    var householdCitizenLookup = SystemAPI.GetBufferLookup<HouseholdCitizen>(isReadOnly: true);
+        //    for (int i = 0; i < homelessHouseholds.Length; i++)
+        //    {
+        //        base.EntityManager.AddComponent<MovingAway>(homelessHouseholds[i]);
+        //        base.EntityManager.RemoveComponent<PropertySeeker>(homelessHouseholds[i]);
+        //        base.EntityManager.RemoveComponent<HomelessHousehold>(homelessHouseholds[i]);
+
+        //        var householdCitizens = householdCitizenLookup[homelessHouseholds[i]];
+        //        for (int j = 0; j < householdCitizens.Length; j++)
+        //        {
+        //            var criminal = new Criminal(Entity.Null, CriminalFlags.Monitored);
+        //            base.EntityManager.AddComponentData(householdCitizens[j], criminal);
+        //        }
+        //    }
+        //    homelessHouseholds.Dispose();
+        //}
 
         public void DeleteStuckHomeless()
         {
@@ -791,7 +823,7 @@ namespace ByeByeHomelessMod
 
             public NativeQueue<SetupQueueItem>.ParallelWriter m_PathfindQueue;
 
-            public NativeQueue<PropertyUtils.RentAction>.ParallelWriter m_RentQueue;
+            public NativeQueue<RentAction>.ParallelWriter m_RentActionQueue;
 
             public EconomyParameterData m_EconomyParameters;
 
@@ -917,10 +949,9 @@ namespace ByeByeHomelessMod
             public void Execute()
             {
                 var random = m_RandomSeed.GetRandom(0);
-                var startIndex = random.NextInt(m_Entities.Length);
-                for (int i = startIndex; i < math.min(kMaxProcessEntitiesPerUpdate, m_Entities.Length - startIndex); i++)
+                for (int i = 0; i < math.min(kMaxProcessEntitiesPerUpdate, m_Entities.Length); i++)
                 {
-                    Entity entity = m_Entities[i];
+                    Entity entity = m_Entities[random.NextInt(m_Entities.Length)];
                     DynamicBuffer<HouseholdCitizen> householdCitizenBuffer = m_CitizenBuffers[entity];
                     if (householdCitizenBuffer.Length == 0)
                     {
@@ -987,7 +1018,7 @@ namespace ByeByeHomelessMod
                         {
                             if (!(flag3 && flag4 && hasValidHomelessHousehold))
                             {
-                                m_RentQueue.Enqueue(new PropertyUtils.RentAction
+                                m_RentActionQueue.Enqueue(new RentAction
                                 {
                                     m_Property = entity2,
                                     m_Renter = entity
@@ -1420,48 +1451,6 @@ namespace ByeByeHomelessMod
 
             public BufferLookup<Renter> __Game_Buildings_Renter_RW_BufferLookup;
 
-            public ComponentLookup<PropertyRenter> __Game_Buildings_PropertyRenter_RW_ComponentLookup;
-
-            [ReadOnly]
-            public ComponentLookup<CompanyData> __Game_Companies_CompanyData_RO_ComponentLookup;
-
-            public ComponentLookup<Household> __Game_Citizens_Household_RW_ComponentLookup;
-
-            [ReadOnly]
-            public ComponentLookup<IndustrialCompany> __Game_Companies_IndustrialCompany_RO_ComponentLookup;
-
-            [ReadOnly]
-            public ComponentLookup<CommercialCompany> __Game_Companies_CommercialCompany_RO_ComponentLookup;
-
-            [ReadOnly]
-            public ComponentLookup<ServiceCompanyData> __Game_Companies_ServiceCompanyData_RO_ComponentLookup;
-
-            [ReadOnly]
-            public ComponentLookup<IndustrialProcessData> __Game_Prefabs_IndustrialProcessData_RO_ComponentLookup;
-
-            public ComponentLookup<WorkProvider> __Game_Companies_WorkProvider_RW_ComponentLookup;
-
-            [ReadOnly]
-            public BufferLookup<Employee> __Game_Companies_Employee_RO_BufferLookup;
-
-            [ReadOnly]
-            public ComponentLookup<Attached> __Game_Objects_Attached_RO_ComponentLookup;
-
-            [ReadOnly]
-            public ComponentLookup<ExtractorCompanyData> __Game_Prefabs_ExtractorCompanyData_RO_ComponentLookup;
-
-            [ReadOnly]
-            public BufferLookup<Game.Areas.SubArea> __Game_Areas_SubArea_RO_BufferLookup;
-
-            [ReadOnly]
-            public ComponentLookup<Geometry> __Game_Areas_Geometry_RO_ComponentLookup;
-
-            [ReadOnly]
-            public ComponentLookup<Game.Areas.Lot> __Game_Areas_Lot_RO_ComponentLookup;
-
-            [ReadOnly]
-            public ComponentLookup<ResourceData> __Game_Prefabs_ResourceData_RO_ComponentLookup;
-
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void __AssignHandles(ref SystemState state)
             {
@@ -1500,22 +1489,6 @@ namespace ByeByeHomelessMod
                 __Game_Citizens_CurrentTransport_RO_ComponentLookup = state.GetComponentLookup<CurrentTransport>(isReadOnly: true);
                 __Game_Citizens_HouseholdCitizen_RO_BufferLookup = state.GetBufferLookup<HouseholdCitizen>(isReadOnly: true);
                 __Game_Agents_PropertySeeker_RW_ComponentLookup = state.GetComponentLookup<PropertySeeker>();
-                __Game_Buildings_Renter_RW_BufferLookup = state.GetBufferLookup<Renter>();
-                __Game_Buildings_PropertyRenter_RW_ComponentLookup = state.GetComponentLookup<PropertyRenter>();
-                __Game_Companies_CompanyData_RO_ComponentLookup = state.GetComponentLookup<CompanyData>(isReadOnly: true);
-                __Game_Citizens_Household_RW_ComponentLookup = state.GetComponentLookup<Household>();
-                __Game_Companies_IndustrialCompany_RO_ComponentLookup = state.GetComponentLookup<IndustrialCompany>(isReadOnly: true);
-                __Game_Companies_CommercialCompany_RO_ComponentLookup = state.GetComponentLookup<CommercialCompany>(isReadOnly: true);
-                __Game_Companies_ServiceCompanyData_RO_ComponentLookup = state.GetComponentLookup<ServiceCompanyData>(isReadOnly: true);
-                __Game_Prefabs_IndustrialProcessData_RO_ComponentLookup = state.GetComponentLookup<IndustrialProcessData>(isReadOnly: true);
-                __Game_Companies_WorkProvider_RW_ComponentLookup = state.GetComponentLookup<WorkProvider>();
-                __Game_Companies_Employee_RO_BufferLookup = state.GetBufferLookup<Employee>(isReadOnly: true);
-                __Game_Objects_Attached_RO_ComponentLookup = state.GetComponentLookup<Attached>(isReadOnly: true);
-                __Game_Prefabs_ExtractorCompanyData_RO_ComponentLookup = state.GetComponentLookup<ExtractorCompanyData>(isReadOnly: true);
-                __Game_Areas_SubArea_RO_BufferLookup = state.GetBufferLookup<Game.Areas.SubArea>(isReadOnly: true);
-                __Game_Areas_Geometry_RO_ComponentLookup = state.GetComponentLookup<Geometry>(isReadOnly: true);
-                __Game_Areas_Lot_RO_ComponentLookup = state.GetComponentLookup<Game.Areas.Lot>(isReadOnly: true);
-                __Game_Prefabs_ResourceData_RO_ComponentLookup = state.GetComponentLookup<ResourceData>(isReadOnly: true);
             }
         }
 
@@ -1556,12 +1529,6 @@ namespace ByeByeHomelessMod
 
         private TaxSystem m_TaxSystem;
 
-        private NativeQueue<PropertyUtils.RentAction> m_RentQueue;
-
-        private NativeList<Entity> m_ReservedProperties;
-
-        private EntityArchetype m_RentEventArchetype;
-
         private TriggerSystem m_TriggerSystem;
 
         private GroundPollutionSystem m_GroundPollutionSystem;
@@ -1577,6 +1544,8 @@ namespace ByeByeHomelessMod
         private CityStatisticsSystem m_CityStatisticsSystem;
 
         private SimulationSystem m_SimulationSystem;
+
+        private PropertyProcessingSystem m_PropertyProcessingSystem;
 
         private EntityQuery m_HealthcareParameterQuery;
 
@@ -1603,8 +1572,6 @@ namespace ByeByeHomelessMod
         protected override void OnCreate()
         {
             base.OnCreate();
-            m_RentQueue = new NativeQueue<PropertyUtils.RentAction>(Allocator.Persistent);
-            m_ReservedProperties = new NativeList<Entity>(Allocator.Persistent);
             m_EndFrameBarrier = base.World.GetOrCreateSystemManaged<EndFrameBarrier>();
             m_PathfindSetupSystem = base.World.GetOrCreateSystemManaged<PathfindSetupSystem>();
             m_ResourceSystem = base.World.GetOrCreateSystemManaged<ResourceSystem>();
@@ -1617,7 +1584,7 @@ namespace ByeByeHomelessMod
             m_TaxSystem = base.World.GetOrCreateSystemManaged<TaxSystem>();
             m_TriggerSystem = base.World.GetOrCreateSystemManaged<TriggerSystem>();
             m_SimulationSystem = base.World.GetOrCreateSystemManaged<SimulationSystem>();
-            m_RentEventArchetype = base.EntityManager.CreateArchetype(ComponentType.ReadWrite<Game.Common.Event>(), ComponentType.ReadWrite<RentersUpdated>());
+            m_PropertyProcessingSystem = base.World.GetOrCreateSystemManaged<PropertyProcessingSystem>();
             m_HouseholdQuery = GetEntityQuery(ComponentType.ReadWrite<Household>(), ComponentType.ReadWrite<PropertySeeker>(), ComponentType.ReadOnly<HouseholdCitizen>(), ComponentType.Exclude<MovingAway>(), ComponentType.Exclude<TouristHousehold>(), ComponentType.Exclude<CommuterHousehold>(), ComponentType.Exclude<CurrentBuilding>(), ComponentType.Exclude<Deleted>(), ComponentType.Exclude<Temp>());
             m_EconomyParameterQuery = GetEntityQuery(ComponentType.ReadOnly<EconomyParameterData>());
             m_DemandParameterQuery = GetEntityQuery(ComponentType.ReadOnly<DemandParameterData>());
@@ -1683,8 +1650,6 @@ namespace ByeByeHomelessMod
             m_EvaluateDistributionMedium.Dispose();
             m_EvaluateDistributionHigh.Dispose();
             m_EvaluateDistributionLowrent.Dispose();
-            m_RentQueue.Dispose();
-            m_ReservedProperties.Dispose();
             base.OnDestroy();
         }
 
@@ -1789,143 +1754,80 @@ namespace ByeByeHomelessMod
             __TypeHandle.__Game_Buildings_PropertyOnMarket_RO_ComponentLookup.Update(ref base.CheckedStateRef);
             __TypeHandle.__Game_Prefabs_BuildingData_RO_ComponentLookup.Update(ref base.CheckedStateRef);
             FindPropertyJob findPropertyJob = default(FindPropertyJob);
-            findPropertyJob.m_Entities = m_HouseholdQuery.ToEntityListAsync(base.World.UpdateAllocator.ToAllocator, out var outJobHandle);
-            findPropertyJob.m_CachedPropertyInfo = cachedPropertyInfo;
-            findPropertyJob.m_BuildingDatas = __TypeHandle.__Game_Prefabs_BuildingData_RO_ComponentLookup;
-            findPropertyJob.m_PropertiesOnMarket = __TypeHandle.__Game_Buildings_PropertyOnMarket_RO_ComponentLookup;
-            findPropertyJob.m_Availabilities = __TypeHandle.__Game_Net_ResourceAvailability_RO_BufferLookup;
-            findPropertyJob.m_SpawnableDatas = __TypeHandle.__Game_Prefabs_SpawnableBuildingData_RO_ComponentLookup;
-            findPropertyJob.m_BuildingProperties = __TypeHandle.__Game_Prefabs_BuildingPropertyData_RO_ComponentLookup;
-            findPropertyJob.m_Buildings = __TypeHandle.__Game_Buildings_Building_RO_ComponentLookup;
-            findPropertyJob.m_PathInformationBuffers = __TypeHandle.__Game_Pathfind_PathInformations_RO_BufferLookup;
-            findPropertyJob.m_PrefabRefs = __TypeHandle.__Game_Prefabs_PrefabRef_RO_ComponentLookup;
-            findPropertyJob.m_ServiceCoverages = __TypeHandle.__Game_Net_ServiceCoverage_RO_BufferLookup;
-            findPropertyJob.m_Workers = __TypeHandle.__Game_Citizens_Worker_RO_ComponentLookup;
-            findPropertyJob.m_Students = __TypeHandle.__Game_Citizens_Student_RO_ComponentLookup;
-            findPropertyJob.m_PropertyRenters = __TypeHandle.__Game_Buildings_PropertyRenter_RO_ComponentLookup;
-            findPropertyJob.m_HomelessHouseholds = __TypeHandle.__Game_Citizens_HomelessHousehold_RO_ComponentLookup;
-            findPropertyJob.m_Citizens = __TypeHandle.__Game_Citizens_Citizen_RO_ComponentLookup;
-            findPropertyJob.m_Crimes = __TypeHandle.__Game_Buildings_CrimeProducer_RO_ComponentLookup;
-            findPropertyJob.m_Lockeds = __TypeHandle.__Game_Prefabs_Locked_RO_ComponentLookup;
-            findPropertyJob.m_Transforms = __TypeHandle.__Game_Objects_Transform_RO_ComponentLookup;
-            findPropertyJob.m_CityModifiers = __TypeHandle.__Game_City_CityModifier_RO_BufferLookup;
-            findPropertyJob.m_HealthProblems = __TypeHandle.__Game_Citizens_HealthProblem_RO_ComponentLookup;
-            findPropertyJob.m_Abandoneds = __TypeHandle.__Game_Buildings_Abandoned_RO_ComponentLookup;
-            findPropertyJob.m_Parks = __TypeHandle.__Game_Buildings_Park_RO_ComponentLookup;
-            findPropertyJob.m_OwnedVehicles = __TypeHandle.__Game_Vehicles_OwnedVehicle_RO_BufferLookup;
-            findPropertyJob.m_ElectricityConsumers = __TypeHandle.__Game_Buildings_ElectricityConsumer_RO_ComponentLookup;
-            findPropertyJob.m_WaterConsumers = __TypeHandle.__Game_Buildings_WaterConsumer_RO_ComponentLookup;
-            findPropertyJob.m_GarbageProducers = __TypeHandle.__Game_Buildings_GarbageProducer_RO_ComponentLookup;
-            findPropertyJob.m_MailProducers = __TypeHandle.__Game_Buildings_MailProducer_RO_ComponentLookup;
-            findPropertyJob.m_Households = __TypeHandle.__Game_Citizens_Household_RO_ComponentLookup;
-            findPropertyJob.m_CurrentBuildings = __TypeHandle.__Game_Citizens_CurrentBuilding_RO_ComponentLookup;
-            findPropertyJob.m_CurrentTransports = __TypeHandle.__Game_Citizens_CurrentTransport_RO_ComponentLookup;
-            findPropertyJob.m_CitizenBuffers = __TypeHandle.__Game_Citizens_HouseholdCitizen_RO_BufferLookup;
-            findPropertyJob.m_PropertySeekers = __TypeHandle.__Game_Agents_PropertySeeker_RW_ComponentLookup;
-            findPropertyJob.m_PollutionMap = map;
-            findPropertyJob.m_AirPollutionMap = map2;
-            findPropertyJob.m_NoiseMap = map3;
-            findPropertyJob.m_TelecomCoverages = data;
-            findPropertyJob.m_HealthcareParameters = m_HealthcareParameterQuery.GetSingleton<HealthcareParameterData>();
-            findPropertyJob.m_ParkParameters = m_ParkParameterQuery.GetSingleton<ParkParameterData>();
-            findPropertyJob.m_EducationParameters = m_EducationParameterQuery.GetSingleton<EducationParameterData>();
-            findPropertyJob.m_TelecomParameters = m_TelecomParameterQuery.GetSingleton<TelecomParameterData>();
-            findPropertyJob.m_GarbageParameters = m_GarbageParameterQuery.GetSingleton<GarbageParameterData>();
-            findPropertyJob.m_PoliceParameters = m_PoliceParameterQuery.GetSingleton<PoliceConfigurationData>();
-            findPropertyJob.m_CitizenHappinessParameterData = m_CitizenHappinessParameterQuery.GetSingleton<CitizenHappinessParameterData>();
-            findPropertyJob.m_ResourcePrefabs = m_ResourceSystem.GetPrefabs();
-            findPropertyJob.m_TaxRates = m_TaxSystem.GetTaxRates();
-            findPropertyJob.m_EconomyParameters = m_EconomyParameterQuery.GetSingleton<EconomyParameterData>();
-            findPropertyJob.m_DemandParameters = m_DemandParameterQuery.GetSingleton<DemandParameterData>();
-            findPropertyJob.m_BaseConsumptionSum = m_ResourceSystem.BaseConsumptionSum;
-            findPropertyJob.m_SimulationFrame = m_SimulationSystem.frameIndex;
-            findPropertyJob.m_RentQueue = m_RentQueue.AsParallelWriter();
-            findPropertyJob.m_City = m_CitySystem.City;
-            findPropertyJob.m_PathfindQueue = m_PathfindSetupSystem.GetQueue(this, 80, 16).AsParallelWriter();
-            findPropertyJob.m_TriggerBuffer = m_TriggerSystem.CreateActionBuffer().AsParallelWriter();
-            findPropertyJob.m_CommandBuffer = m_EndFrameBarrier.CreateCommandBuffer();
-            findPropertyJob.m_StatisticsQueue = m_CityStatisticsSystem.GetStatisticsEventQueue(out var deps);
-            findPropertyJob.m_RandomSeed = RandomSeed.Next();
-            FindPropertyJob jobData2 = findPropertyJob;
-            JobHandle job = JobChunkExtensions.ScheduleParallel(jobData, m_FreePropertyQuery, JobUtils.CombineDependencies(base.Dependency, dependencies, dependencies3, dependencies2, dependencies4));
-            JobHandle jobHandle = IJobExtensions.Schedule(jobData2, JobHandle.CombineDependencies(job, outJobHandle, deps));
-            m_EndFrameBarrier.AddJobHandleForProducer(jobHandle);
-            m_PathfindSetupSystem.AddQueueWriter(jobHandle);
-            m_ResourceSystem.AddPrefabsReader(jobHandle);
-            m_AirPollutionSystem.AddReader(jobHandle);
-            m_NoisePollutionSystem.AddReader(jobHandle);
-            m_GroundPollutionSystem.AddReader(jobHandle);
-            m_TelecomCoverageSystem.AddReader(jobHandle);
-            m_TriggerSystem.AddActionBufferWriter(jobHandle);
-            m_CityStatisticsSystem.AddWriter(jobHandle);
-            m_TaxSystem.AddReader(jobHandle);
-            __TypeHandle.__Game_Prefabs_ResourceData_RO_ComponentLookup.Update(ref base.CheckedStateRef);
-            __TypeHandle.__Game_Areas_Lot_RO_ComponentLookup.Update(ref base.CheckedStateRef);
-            __TypeHandle.__Game_Areas_Geometry_RO_ComponentLookup.Update(ref base.CheckedStateRef);
-            __TypeHandle.__Game_Areas_SubArea_RO_BufferLookup.Update(ref base.CheckedStateRef);
-            __TypeHandle.__Game_Prefabs_ExtractorCompanyData_RO_ComponentLookup.Update(ref base.CheckedStateRef);
-            __TypeHandle.__Game_Objects_Attached_RO_ComponentLookup.Update(ref base.CheckedStateRef);
-            __TypeHandle.__Game_Prefabs_SpawnableBuildingData_RO_ComponentLookup.Update(ref base.CheckedStateRef);
-            __TypeHandle.__Game_Companies_Employee_RO_BufferLookup.Update(ref base.CheckedStateRef);
-            __TypeHandle.__Game_Buildings_Park_RO_ComponentLookup.Update(ref base.CheckedStateRef);
-            __TypeHandle.__Game_Citizens_HomelessHousehold_RO_ComponentLookup.Update(ref base.CheckedStateRef);
-            __TypeHandle.__Game_Buildings_Abandoned_RO_ComponentLookup.Update(ref base.CheckedStateRef);
-            __TypeHandle.__Game_Citizens_HouseholdCitizen_RO_BufferLookup.Update(ref base.CheckedStateRef);
-            __TypeHandle.__Game_Companies_WorkProvider_RW_ComponentLookup.Update(ref base.CheckedStateRef);
-            __TypeHandle.__Game_Prefabs_IndustrialProcessData_RO_ComponentLookup.Update(ref base.CheckedStateRef);
-            __TypeHandle.__Game_Companies_ServiceCompanyData_RO_ComponentLookup.Update(ref base.CheckedStateRef);
-            __TypeHandle.__Game_Prefabs_BuildingData_RO_ComponentLookup.Update(ref base.CheckedStateRef);
-            __TypeHandle.__Game_Companies_CommercialCompany_RO_ComponentLookup.Update(ref base.CheckedStateRef);
-            __TypeHandle.__Game_Companies_IndustrialCompany_RO_ComponentLookup.Update(ref base.CheckedStateRef);
-            __TypeHandle.__Game_Citizens_Household_RW_ComponentLookup.Update(ref base.CheckedStateRef);
-            __TypeHandle.__Game_Companies_CompanyData_RO_ComponentLookup.Update(ref base.CheckedStateRef);
-            __TypeHandle.__Game_Buildings_PropertyRenter_RW_ComponentLookup.Update(ref base.CheckedStateRef);
-            __TypeHandle.__Game_Prefabs_PrefabRef_RO_ComponentLookup.Update(ref base.CheckedStateRef);
-            __TypeHandle.__Game_Prefabs_ParkData_RO_ComponentLookup.Update(ref base.CheckedStateRef);
-            __TypeHandle.__Game_Prefabs_BuildingPropertyData_RO_ComponentLookup.Update(ref base.CheckedStateRef);
-            __TypeHandle.__Game_Buildings_Renter_RW_BufferLookup.Update(ref base.CheckedStateRef);
-            __TypeHandle.__Game_Buildings_PropertyOnMarket_RO_ComponentLookup.Update(ref base.CheckedStateRef);
-            RentJob jobData3 = default(RentJob);
-            jobData3.m_RentEventArchetype = m_RentEventArchetype;
-            jobData3.m_PropertiesOnMarket = __TypeHandle.__Game_Buildings_PropertyOnMarket_RO_ComponentLookup;
-            jobData3.m_Renters = __TypeHandle.__Game_Buildings_Renter_RW_BufferLookup;
-            jobData3.m_BuildingPropertyDatas = __TypeHandle.__Game_Prefabs_BuildingPropertyData_RO_ComponentLookup;
-            jobData3.m_ParkDatas = __TypeHandle.__Game_Prefabs_ParkData_RO_ComponentLookup;
-            jobData3.m_PrefabRefs = __TypeHandle.__Game_Prefabs_PrefabRef_RO_ComponentLookup;
-            jobData3.m_PropertyRenters = __TypeHandle.__Game_Buildings_PropertyRenter_RW_ComponentLookup;
-            jobData3.m_Companies = __TypeHandle.__Game_Companies_CompanyData_RO_ComponentLookup;
-            jobData3.m_Households = __TypeHandle.__Game_Citizens_Household_RW_ComponentLookup;
-            jobData3.m_Industrials = __TypeHandle.__Game_Companies_IndustrialCompany_RO_ComponentLookup;
-            jobData3.m_Commercials = __TypeHandle.__Game_Companies_CommercialCompany_RO_ComponentLookup;
-            jobData3.m_BuildingDatas = __TypeHandle.__Game_Prefabs_BuildingData_RO_ComponentLookup;
-            jobData3.m_ServiceCompanyDatas = __TypeHandle.__Game_Companies_ServiceCompanyData_RO_ComponentLookup;
-            jobData3.m_IndustrialProcessDatas = __TypeHandle.__Game_Prefabs_IndustrialProcessData_RO_ComponentLookup;
-            jobData3.m_WorkProviders = __TypeHandle.__Game_Companies_WorkProvider_RW_ComponentLookup;
-            jobData3.m_HouseholdCitizens = __TypeHandle.__Game_Citizens_HouseholdCitizen_RO_BufferLookup;
-            jobData3.m_Abandoneds = __TypeHandle.__Game_Buildings_Abandoned_RO_ComponentLookup;
-            jobData3.m_HomelessHouseholds = __TypeHandle.__Game_Citizens_HomelessHousehold_RO_ComponentLookup;
-            jobData3.m_Parks = __TypeHandle.__Game_Buildings_Park_RO_ComponentLookup;
-            jobData3.m_Employees = __TypeHandle.__Game_Companies_Employee_RO_BufferLookup;
-            jobData3.m_SpawnableBuildingDatas = __TypeHandle.__Game_Prefabs_SpawnableBuildingData_RO_ComponentLookup;
-            jobData3.m_Attacheds = __TypeHandle.__Game_Objects_Attached_RO_ComponentLookup;
-            jobData3.m_ExtractorCompanyDatas = __TypeHandle.__Game_Prefabs_ExtractorCompanyData_RO_ComponentLookup;
-            jobData3.m_SubAreaBufs = __TypeHandle.__Game_Areas_SubArea_RO_BufferLookup;
-            jobData3.m_Geometries = __TypeHandle.__Game_Areas_Geometry_RO_ComponentLookup;
-            jobData3.m_Lots = __TypeHandle.__Game_Areas_Lot_RO_ComponentLookup;
-            jobData3.m_ResourcePrefabs = m_ResourceSystem.GetPrefabs();
-            jobData3.m_Resources = __TypeHandle.__Game_Prefabs_ResourceData_RO_ComponentLookup;
-            jobData3.m_StatisticsQueue = m_CityStatisticsSystem.GetStatisticsEventQueue(out var deps2);
-            jobData3.m_TriggerQueue = m_TriggerSystem.CreateActionBuffer();
-            jobData3.m_AreaType = Game.Zones.AreaType.Residential;
-            jobData3.m_CommandBuffer = m_EndFrameBarrier.CreateCommandBuffer();
-            jobData3.m_RentQueue = m_RentQueue;
-            jobData3.m_ReservedProperties = m_ReservedProperties;
-            jobData3.m_DebugDisableHomeless = debugDisableHomeless;
-            jobHandle = IJobExtensions.Schedule(jobData3, JobHandle.CombineDependencies(deps2, jobHandle));
-            m_TriggerSystem.AddActionBufferWriter(jobHandle);
-            m_CityStatisticsSystem.AddWriter(jobHandle);
-            m_EndFrameBarrier.AddJobHandleForProducer(jobHandle);
-            base.Dependency = jobHandle;
+            JobHandle outJobHandle;
+            JobHandle deps;
+            JobHandle deps2;
+            FindPropertyJob jobData2 = new FindPropertyJob
+            {
+                m_Entities = m_HouseholdQuery.ToEntityListAsync(base.World.UpdateAllocator.ToAllocator, out outJobHandle),
+                m_CachedPropertyInfo = cachedPropertyInfo,
+                m_BuildingDatas = __TypeHandle.__Game_Prefabs_BuildingData_RO_ComponentLookup,
+                m_PropertiesOnMarket = __TypeHandle.__Game_Buildings_PropertyOnMarket_RO_ComponentLookup,
+                m_Availabilities = __TypeHandle.__Game_Net_ResourceAvailability_RO_BufferLookup,
+                m_SpawnableDatas = __TypeHandle.__Game_Prefabs_SpawnableBuildingData_RO_ComponentLookup,
+                m_BuildingProperties = __TypeHandle.__Game_Prefabs_BuildingPropertyData_RO_ComponentLookup,
+                m_Buildings = __TypeHandle.__Game_Buildings_Building_RO_ComponentLookup,
+                m_PathInformationBuffers = __TypeHandle.__Game_Pathfind_PathInformations_RO_BufferLookup,
+                m_PrefabRefs = __TypeHandle.__Game_Prefabs_PrefabRef_RO_ComponentLookup,
+                m_ServiceCoverages = __TypeHandle.__Game_Net_ServiceCoverage_RO_BufferLookup,
+                m_Workers = __TypeHandle.__Game_Citizens_Worker_RO_ComponentLookup,
+                m_Students = __TypeHandle.__Game_Citizens_Student_RO_ComponentLookup,
+                m_PropertyRenters = __TypeHandle.__Game_Buildings_PropertyRenter_RO_ComponentLookup,
+                m_HomelessHouseholds = __TypeHandle.__Game_Citizens_HomelessHousehold_RO_ComponentLookup,
+                m_Citizens = __TypeHandle.__Game_Citizens_Citizen_RO_ComponentLookup,
+                m_Crimes = __TypeHandle.__Game_Buildings_CrimeProducer_RO_ComponentLookup,
+                m_Lockeds = __TypeHandle.__Game_Prefabs_Locked_RO_ComponentLookup,
+                m_Transforms = __TypeHandle.__Game_Objects_Transform_RO_ComponentLookup,
+                m_CityModifiers = __TypeHandle.__Game_City_CityModifier_RO_BufferLookup,
+                m_HealthProblems = __TypeHandle.__Game_Citizens_HealthProblem_RO_ComponentLookup,
+                m_Abandoneds = __TypeHandle.__Game_Buildings_Abandoned_RO_ComponentLookup,
+                m_Parks = __TypeHandle.__Game_Buildings_Park_RO_ComponentLookup,
+                m_OwnedVehicles = __TypeHandle.__Game_Vehicles_OwnedVehicle_RO_BufferLookup,
+                m_ElectricityConsumers = __TypeHandle.__Game_Buildings_ElectricityConsumer_RO_ComponentLookup,
+                m_WaterConsumers = __TypeHandle.__Game_Buildings_WaterConsumer_RO_ComponentLookup,
+                m_GarbageProducers = __TypeHandle.__Game_Buildings_GarbageProducer_RO_ComponentLookup,
+                m_MailProducers = __TypeHandle.__Game_Buildings_MailProducer_RO_ComponentLookup,
+                m_Households = __TypeHandle.__Game_Citizens_Household_RO_ComponentLookup,
+                m_CurrentBuildings = __TypeHandle.__Game_Citizens_CurrentBuilding_RO_ComponentLookup,
+                m_CurrentTransports = __TypeHandle.__Game_Citizens_CurrentTransport_RO_ComponentLookup,
+                m_CitizenBuffers = __TypeHandle.__Game_Citizens_HouseholdCitizen_RO_BufferLookup,
+                m_PropertySeekers = __TypeHandle.__Game_Agents_PropertySeeker_RW_ComponentLookup,
+                m_PollutionMap = map,
+                m_AirPollutionMap = map2,
+                m_NoiseMap = map3,
+                m_TelecomCoverages = data,
+                m_HealthcareParameters = m_HealthcareParameterQuery.GetSingleton<HealthcareParameterData>(),
+                m_ParkParameters = m_ParkParameterQuery.GetSingleton<ParkParameterData>(),
+                m_EducationParameters = m_EducationParameterQuery.GetSingleton<EducationParameterData>(),
+                m_TelecomParameters = m_TelecomParameterQuery.GetSingleton<TelecomParameterData>(),
+                m_GarbageParameters = m_GarbageParameterQuery.GetSingleton<GarbageParameterData>(),
+                m_PoliceParameters = m_PoliceParameterQuery.GetSingleton<PoliceConfigurationData>(),
+                m_CitizenHappinessParameterData = m_CitizenHappinessParameterQuery.GetSingleton<CitizenHappinessParameterData>(),
+                m_ResourcePrefabs = m_ResourceSystem.GetPrefabs(),
+                m_TaxRates = m_TaxSystem.GetTaxRates(),
+                m_EconomyParameters = m_EconomyParameterQuery.GetSingleton<EconomyParameterData>(),
+                m_DemandParameters = m_DemandParameterQuery.GetSingleton<DemandParameterData>(),
+                m_BaseConsumptionSum = m_ResourceSystem.BaseConsumptionSum,
+                m_SimulationFrame = m_SimulationSystem.frameIndex,
+                m_RentActionQueue = m_PropertyProcessingSystem.GetRentActionQueue(out deps).AsParallelWriter(),
+                m_City = m_CitySystem.City,
+                m_PathfindQueue = m_PathfindSetupSystem.GetQueue(this, 80, 16).AsParallelWriter(),
+                m_TriggerBuffer = m_TriggerSystem.CreateActionBuffer().AsParallelWriter(),
+                m_CommandBuffer = m_EndFrameBarrier.CreateCommandBuffer(),
+                m_StatisticsQueue = m_CityStatisticsSystem.GetStatisticsEventQueue(out deps2)
+            };
+            JobHandle job = JobChunkExtensions.ScheduleParallel(jobData, m_FreePropertyQuery, JobUtils.CombineDependencies(base.Dependency, dependencies, dependencies3, dependencies2, dependencies4, deps));
+            base.Dependency = IJobExtensions.Schedule(jobData2, JobHandle.CombineDependencies(job, outJobHandle, deps2));
+            m_EndFrameBarrier.AddJobHandleForProducer(base.Dependency);
+            m_PathfindSetupSystem.AddQueueWriter(base.Dependency);
+            m_ResourceSystem.AddPrefabsReader(base.Dependency);
+            m_AirPollutionSystem.AddReader(base.Dependency);
+            m_NoisePollutionSystem.AddReader(base.Dependency);
+            m_GroundPollutionSystem.AddReader(base.Dependency);
+            m_TelecomCoverageSystem.AddReader(base.Dependency);
+            m_TriggerSystem.AddActionBufferWriter(base.Dependency);
+            m_CityStatisticsSystem.AddWriter(base.Dependency);
+            m_TaxSystem.AddReader(base.Dependency);
             cachedPropertyInfo.Dispose(base.Dependency);
         }
 
