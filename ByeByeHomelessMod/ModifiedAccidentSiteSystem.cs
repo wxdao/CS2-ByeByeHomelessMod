@@ -152,13 +152,13 @@ namespace ByeByeHomelessMod
                                     continue;
                                 }
                                 Criminal criminal = m_CriminalData[targetElementEntity];
-                                if (criminal.m_Event == site.m_Event &&
-                                    ((criminal.m_Flags & CriminalFlags.Arrested) == 0 ||
-                                     !(m_CurrentTransportData.TryGetComponent(targetElementEntity, out var currentTransport) &&
-                                       m_CurrentVehicleData.TryGetComponent(currentTransport.m_CurrentTransport, out var currentVehicle) &&
-                                       m_PoliceCarData.HasComponent(currentVehicle.m_Vehicle)) ||
-                                     !(m_TravelPurposeData.TryGetComponent(targetElementEntity, out var travelPurpose) &&
-                                       travelPurpose.m_Purpose == Purpose.GoingToJail)))
+                                if (criminal.m_Event == site.m_Event && 
+                                    ((criminal.m_Flags & CriminalFlags.Arrested) == 0 || 
+                                     (!(m_CurrentTransportData.TryGetComponent(targetElementEntity, out var currentTransport) && 
+                                        m_CurrentVehicleData.TryGetComponent(currentTransport.m_CurrentTransport, out var currentVehicle) && 
+                                        m_PoliceCarData.HasComponent(currentVehicle.m_Vehicle)) && 
+                                      m_TravelPurposeData.TryGetComponent(targetElementEntity, out var travelPurpose) && 
+                                      travelPurpose.m_Purpose == Purpose.GoingToJail)))
                                 {
                                     involvedCount++;
                                     if ((criminal.m_Flags & CriminalFlags.Monitored) != 0)
