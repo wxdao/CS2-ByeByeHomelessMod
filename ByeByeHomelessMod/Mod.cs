@@ -23,7 +23,6 @@ using System.Collections.Generic;
 using Game.Companies;
 using Game.PSI;
 using Colossal.PSI.Common;
-using Colossal.Entities;
 using Colossal.Serialization.Entities;
 using Colossal.Mathematics;
 using Game.Events;
@@ -88,8 +87,12 @@ namespace ByeByeHomelessMod
             World.DefaultGameObjectInjectionWorld.GetOrCreateSystemManaged<RemovedSystem>().Enabled = false;
             updateSystem.UpdateAt<ModifiedRemovedSystem>(SystemUpdatePhase.Modification5);
 
+            World.DefaultGameObjectInjectionWorld.GetOrCreateSystemManaged<AccidentSiteSystem>().Enabled = false;
+            updateSystem.UpdateAt<ModifiedAccidentSiteSystem>(SystemUpdatePhase.GameSimulation);
+
             updateSystem.UpdateAt<ByeByeHomelessSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAt<ByeByeExtraCompanySystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateAt<HomelessCriminalSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAt<CriminalFixSystem>(SystemUpdatePhase.GameSimulation);
         }
 
@@ -216,6 +219,25 @@ namespace ByeByeHomelessMod
         }
     }
 
+
+    public struct HomelessCriminal : IComponentData, IQueryTypeParameter, ISerializable
+    {
+        public Entity m_CrimePrefab;
+
+        public bool m_Arrested;
+
+        public void Serialize<TWriter>(TWriter writer) where TWriter : IWriter
+        {
+            writer.Write(m_CrimePrefab);
+            writer.Write(m_Arrested);
+        }
+
+        public void Deserialize<TReader>(TReader reader) where TReader : IReader
+        {
+            reader.Read(out m_CrimePrefab);
+            reader.Read(out m_Arrested);
+        }
+    }
 
     public partial class ByeByeHomelessSystem : GameSystemBase
     {
@@ -411,21 +433,6 @@ namespace ByeByeHomelessMod
 
         public void ArrestHomeless()
         {
-            var crimeData = new CrimeData
-            {
-                m_RandomTargetType = EventTargetType.Citizen,
-                m_AlarmDelay = new Bounds1(0f, 0f),
-                m_CrimeDuration = new Bounds1(1000f, 1000f),
-                m_CrimeIncomeAbsolute = new Bounds1(0f, 0f),
-                m_CrimeIncomeRelative = new Bounds1(0f, 0f),
-                m_JailTimeRange = new Bounds1(0.125f, 1f),
-                m_PrisonTimeRange = new Bounds1(1f, 100f),
-                m_PrisonProbability = 50f,
-            };
-
-            var crimePrefab = base.EntityManager.CreateEntity();
-            base.EntityManager.AddComponentData(crimePrefab, crimeData);
-
             var query = EntityManager.CreateEntityQuery(ComponentType.ReadOnly<HomelessHousehold>(), ComponentType.ReadOnly<HouseholdCitizen>(), ComponentType.Exclude<MovingAway>(), ComponentType.Exclude<Deleted>(), ComponentType.Exclude<Temp>());
             var homelessHouseholds = query.ToEntityArray(Allocator.TempJob);
             for (int i = 0; i < homelessHouseholds.Length; i++)
@@ -433,32 +440,31 @@ namespace ByeByeHomelessMod
                 var householdCitizens = base.EntityManager.GetBuffer<HouseholdCitizen>(homelessHouseholds[i], true);
                 for (int j = 0; j < householdCitizens.Length; j++)
                 {
-                    if (!base.EntityManager.TryGetComponent<CurrentBuilding>(householdCitizens[j], out var currentBuilding))
+                    if (base.EntityManager.HasComponent<HomelessCriminal>(householdCitizens[j]))
                     {
                         continue;
                     }
 
-                    if (!base.EntityManager.HasComponent<CrimeProducer>(currentBuilding.m_CurrentBuilding))
+                    var crimeData = new CrimeData
                     {
-                        continue;
-                    }
+                        m_RandomTargetType = EventTargetType.Citizen,
+                        m_AlarmDelay = new Bounds1(0f, 0f),
+                        m_CrimeDuration = new Bounds1(1000f, 1000f),
+                        m_CrimeIncomeAbsolute = new Bounds1(0f, 0f),
+                        m_CrimeIncomeRelative = new Bounds1(0f, 0f),
+                        m_JailTimeRange = new Bounds1(0.125f, 1f),
+                        m_PrisonTimeRange = new Bounds1(1f, 100f),
+                        m_PrisonProbability = 50f,
+                    };
 
-                    var crimeEvent = base.EntityManager.CreateEntity();
-                    base.EntityManager.AddComponentData(crimeEvent, new PrefabRef(crimePrefab));
-                    var targets = base.EntityManager.AddBuffer<TargetElement>(crimeEvent);
-                    targets.Add(new TargetElement(householdCitizens[j]));
+                    var crimePrefab = base.EntityManager.CreateEntity();
+                    base.EntityManager.AddComponentData(crimePrefab, crimeData);
 
-                    var criminal = new Criminal(crimeEvent, CriminalFlags.Robber);
-                    base.EntityManager.AddComponentData(householdCitizens[j], criminal);
 
-                    base.EntityManager.AddComponentData(householdCitizens[j], new TravelPurpose
+                    base.EntityManager.AddComponentData(householdCitizens[j], new HomelessCriminal
                     {
-                        m_Purpose = Game.Citizens.Purpose.Crime,
+                        m_CrimePrefab = crimePrefab,
                     });
-                    if (base.EntityManager.TryGetBuffer<TripNeeded>(householdCitizens[j], false, out var tripNeededs))
-                    {
-                        tripNeededs.Clear();
-                    }
                 }
             }
             homelessHouseholds.Dispose();
@@ -542,6 +548,175 @@ namespace ByeByeHomelessMod
         }
     }
 
+    public partial class HomelessCriminalSystem : GameSystemBase
+    {
+        [BurstCompile]
+        private struct HomelessCriminalJob : IJobChunk
+        {
+            [ReadOnly]
+            public EntityTypeHandle m_EntityType;
+
+            [ReadOnly]
+            public ComponentTypeHandle<HomelessCriminal> m_HomelessCriminalType;
+
+            [ReadOnly]
+            public ComponentTypeHandle<CurrentBuilding> m_CurrentBuildingType;
+
+            [ReadOnly]
+            public ComponentTypeHandle<Criminal> m_CriminalType;
+
+            [ReadOnly]
+            public ComponentTypeHandle<Deleted> m_DeletedType;
+
+            [ReadOnly]
+            public ComponentLookup<CrimeProducer> m_CrimeProducerLookup;
+
+            [ReadOnly]
+            public ComponentLookup<Game.Buildings.PoliceStation> m_PoliceStationData;
+
+            [ReadOnly]
+            public ComponentLookup<Game.Buildings.Prison> m_PrisonData;
+
+            public EntityArchetype m_CrimeEventArchetype;
+
+            public EntityCommandBuffer.ParallelWriter m_CommandBuffer;
+
+            public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
+            {
+                var entities = chunk.GetNativeArray(m_EntityType);
+
+                var homelessCriminalArray = chunk.GetNativeArray(ref m_HomelessCriminalType);
+
+                var deletedArray = chunk.GetNativeArray(ref m_DeletedType);
+                var hasDeleted = deletedArray.Length > 0;
+
+                var currentBuildingArray = chunk.GetNativeArray(ref m_CurrentBuildingType);
+                var hasCurrentBuilding = currentBuildingArray.Length > 0;
+
+                var criminalArray = chunk.GetNativeArray(ref m_CriminalType);
+                var hasCriminal = criminalArray.Length > 0;
+
+                if (hasDeleted)
+                {
+                    for (var i = 0; i < entities.Length; i++)
+                    {
+                        var homelessCriminal = homelessCriminalArray[i];
+
+                        if (homelessCriminal.m_CrimePrefab == Entity.Null)
+                        {
+                            continue;
+                        }
+
+                        m_CommandBuffer.DestroyEntity(unfilteredChunkIndex, homelessCriminal.m_CrimePrefab);
+                        homelessCriminal.m_CrimePrefab = Entity.Null;
+                    }
+
+                    return;
+                }
+
+                for (var i = 0; i < entities.Length; i++)
+                {
+                    var entity = entities[i];
+                    var homelessCriminal = homelessCriminalArray[i];
+
+                    if (homelessCriminal.m_Arrested)
+                    {
+                        if (!hasCriminal || criminalArray[i].m_Event == Entity.Null)
+                        {
+                            m_CommandBuffer.DestroyEntity(unfilteredChunkIndex, homelessCriminal.m_CrimePrefab);
+                            m_CommandBuffer.RemoveComponent<HomelessCriminal>(unfilteredChunkIndex, entity);
+
+                            continue;
+                        }
+
+                        continue;
+                    }
+
+                    if (hasCriminal && (criminalArray[i].m_Flags & (CriminalFlags.Arrested | CriminalFlags.Sentenced | CriminalFlags.Prisoner)) != 0)
+                    {
+                        m_CommandBuffer.SetComponent(unfilteredChunkIndex, entity, new HomelessCriminal
+                        {
+                            m_CrimePrefab = homelessCriminal.m_CrimePrefab,
+                            m_Arrested = true,
+                        });
+
+                        continue;
+                    }
+
+                    if (!hasCriminal || criminalArray[i].m_Event == Entity.Null)
+                    {
+                        if (hasCurrentBuilding && m_CrimeProducerLookup.HasComponent(currentBuildingArray[i].m_CurrentBuilding))
+                        {
+                            var crimeEvent = m_CommandBuffer.CreateEntity(unfilteredChunkIndex, m_CrimeEventArchetype);
+                            m_CommandBuffer.SetComponent(unfilteredChunkIndex, crimeEvent, new PrefabRef(homelessCriminal.m_CrimePrefab));
+                            var targets = m_CommandBuffer.SetBuffer<TargetElement>(unfilteredChunkIndex, crimeEvent);
+                            targets.Add(new TargetElement(entity));
+
+                            var criminal = new Criminal(crimeEvent, CriminalFlags.Robber);
+                            m_CommandBuffer.AddComponent(unfilteredChunkIndex, entity, criminal);
+
+                            m_CommandBuffer.AddComponent(unfilteredChunkIndex, entity, new TravelPurpose
+                            {
+                                m_Purpose = Game.Citizens.Purpose.Crime,
+                            });
+
+                            continue;
+                        }
+
+                        continue;
+                    }
+                }
+            }
+
+            void IJobChunk.Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
+            {
+                Execute(in chunk, unfilteredChunkIndex, useEnabledMask, in chunkEnabledMask);
+            }
+        }
+
+        private EntityQuery m_HomelessCriminalGroup;
+
+        private EndFrameBarrier m_EndFrameBarrier;
+
+        public override int GetUpdateInterval(SystemUpdatePhase phase)
+        {
+            //return 262144 / 64;
+            return 64;
+        }
+
+        protected override void OnCreate()
+        {
+            base.OnCreate();
+            m_EndFrameBarrier = base.World.GetOrCreateSystemManaged<EndFrameBarrier>();
+            m_HomelessCriminalGroup = GetEntityQuery(ComponentType.ReadOnly<HomelessCriminal>(), ComponentType.Exclude<Temp>());
+            RequireForUpdate(m_HomelessCriminalGroup);
+        }
+
+        protected override void OnUpdate()
+        {
+            HomelessCriminalJob job = new HomelessCriminalJob
+            {
+                m_EntityType = SystemAPI.GetEntityTypeHandle(),
+                m_HomelessCriminalType = SystemAPI.GetComponentTypeHandle<HomelessCriminal>(isReadOnly: true),
+                m_CurrentBuildingType = SystemAPI.GetComponentTypeHandle<CurrentBuilding>(isReadOnly: true),
+                m_CriminalType = SystemAPI.GetComponentTypeHandle<Criminal>(isReadOnly: true),
+                m_DeletedType = SystemAPI.GetComponentTypeHandle<Deleted>(isReadOnly: true),
+                m_CrimeProducerLookup = SystemAPI.GetComponentLookup<CrimeProducer>(isReadOnly: true),
+                m_PoliceStationData = SystemAPI.GetComponentLookup<Game.Buildings.PoliceStation>(isReadOnly: true),
+                m_PrisonData = SystemAPI.GetComponentLookup<Game.Buildings.Prison>(isReadOnly: true),
+                m_CommandBuffer = m_EndFrameBarrier.CreateCommandBuffer().AsParallelWriter(),
+                m_CrimeEventArchetype = base.EntityManager.CreateArchetype(ComponentType.ReadWrite<Game.Events.Event>(), ComponentType.ReadWrite<Game.Events.Crime>(), ComponentType.ReadWrite<PrefabRef>(), ComponentType.ReadWrite<TargetElement>()),
+            };
+            base.Dependency = JobChunkExtensions.ScheduleParallel(job, m_HomelessCriminalGroup, base.Dependency);
+            m_EndFrameBarrier.AddJobHandleForProducer(base.Dependency);
+        }
+
+        public HomelessCriminalSystem()
+        {
+        }
+    }
+
+
     public partial class CriminalFixSystem : GameSystemBase
     {
         [BurstCompile]
@@ -559,16 +734,33 @@ namespace ByeByeHomelessMod
             [ReadOnly]
             public ComponentLookup<AccidentSite> m_AccidentSiteLookup;
 
+            [ReadOnly]
+            public ComponentLookup<Game.Vehicles.PoliceCar> m_PoliceCarLookup;
+
+            [ReadOnly]
+            public ComponentLookup<Target> m_TargetLookup;
+
             public EntityCommandBuffer.ParallelWriter m_CommandBuffer;
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var nativeArray = chunk.GetNativeArray(m_EntityType);
+                var entities = chunk.GetNativeArray(m_EntityType);
+
                 var currentBuildingArray = chunk.GetNativeArray(ref m_CurrentBuildingType);
+                var hasCurrentBuilding = currentBuildingArray.Length > 0;
+
                 var tripNeededBuffer = chunk.GetBufferAccessor(ref m_TripNeededType);
-                for (int i = 0; i < nativeArray.Length; i++)
+                var hasTripNeeded = tripNeededBuffer.Length > 0;
+
+                for (int i = 0; i < entities.Length; i++)
                 {
-                    var entity = nativeArray[i];
+                    var entity = entities[i];
+
+                    if (!hasCurrentBuilding || !hasTripNeeded)
+                    {
+                        continue;
+                    }
+
                     var currentBuilding = currentBuildingArray[i];
                     var tripNeededs = tripNeededBuffer[i];
 
@@ -617,22 +809,23 @@ namespace ByeByeHomelessMod
         {
             base.OnCreate();
             m_EndFrameBarrier = base.World.GetOrCreateSystemManaged<EndFrameBarrier>();
-            m_LostCriminalGroup = GetEntityQuery(ComponentType.ReadOnly<Criminal>(), ComponentType.ReadOnly<CurrentBuilding>(), ComponentType.ReadOnly<TripNeeded>(), ComponentType.Exclude<Deleted>(), ComponentType.Exclude<Temp>());
+            m_LostCriminalGroup = GetEntityQuery(ComponentType.ReadOnly<Criminal>(), ComponentType.Exclude<Deleted>(), ComponentType.Exclude<Temp>());
             RequireForUpdate(m_LostCriminalGroup);
         }
 
         protected override void OnUpdate()
         {
-            CriminalFixJob criminalFixJob = new CriminalFixJob
+            CriminalFixJob job = new CriminalFixJob
             {
                 m_EntityType = SystemAPI.GetEntityTypeHandle(),
                 m_CurrentBuildingType = SystemAPI.GetComponentTypeHandle<CurrentBuilding>(isReadOnly: true),
                 m_TripNeededType = SystemAPI.GetBufferTypeHandle<TripNeeded>(isReadOnly: true),
+                m_TargetLookup = SystemAPI.GetComponentLookup<Target>(isReadOnly: true),
                 m_AccidentSiteLookup = SystemAPI.GetComponentLookup<AccidentSite>(isReadOnly: true),
+                m_PoliceCarLookup = SystemAPI.GetComponentLookup<Game.Vehicles.PoliceCar>(isReadOnly: true),
                 m_CommandBuffer = m_EndFrameBarrier.CreateCommandBuffer().AsParallelWriter(),
             };
-            CriminalFixJob jobData = criminalFixJob;
-            base.Dependency = JobChunkExtensions.ScheduleParallel(jobData, m_LostCriminalGroup, base.Dependency);
+            base.Dependency = JobChunkExtensions.ScheduleParallel(job, m_LostCriminalGroup, base.Dependency);
             m_EndFrameBarrier.AddJobHandleForProducer(base.Dependency);
         }
 
