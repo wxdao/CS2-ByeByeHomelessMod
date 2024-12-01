@@ -29,14 +29,14 @@ For first-time installations or if you suspect problems with homelessness later 
 	<!--Link to the forum post where the mod can be discussed-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/bye-bye-homeless.1694220/" />
 	<!--Version of the mod-->
-	<ModVersion Value="3.5.2" />
+	<ModVersion Value="3.5.3" />
 	<!--Recommended version of the base game to use the mod-->
 	<GameVersion Value="1.1.*" />
 	<!--Dependency for the mod, can be set multiple times-->
 	<Dependency Id="" />
 	<!--Change log for new version. Single line or multi line. Supports minimal markdown subset-->
 	<ChangeLog>
-- Fix a bug in the game's criminal system. (3.5.1 - 3.5.2)
+- Fix a bug in the game's criminal system. (3.5.1 - 3.5.3)
 - Updated for 1.1.12f; add "arrest homeless" button. (3.5.0)
 - Revert some changes. (3.4.0)
 - Campers have one month to find housing or they will be kicked out. (3.3.0)

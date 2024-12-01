@@ -454,7 +454,7 @@ namespace ByeByeHomelessMod
                         m_CrimeIncomeRelative = new Bounds1(0f, 0f),
                         m_JailTimeRange = new Bounds1(0.125f, 1f),
                         m_PrisonTimeRange = new Bounds1(1f, 100f),
-                        m_PrisonProbability = 50f,
+                        m_PrisonProbability = 100f,
                     };
 
                     var crimePrefab = base.EntityManager.CreateEntity();
