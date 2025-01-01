@@ -52,15 +52,14 @@ namespace ByeByeHomelessMod
             GameManager.instance.localizationManager.AddSource("en-US", new LocaleEN(Setting));
 
             log.Info($"Game version: {Game.Version.current.shortVersion}");
-            if (Game.Version.current.shortVersion != "1.1.12f1")
+            if (Game.Version.current.shortVersion != "1.2.0f1")
             {
                 NotificationSystem.Push("BBH_VERSION_NOTICE", "Bye Bye Homeless", "The mod is disabled due to unsupported game version.", null, null, null, ProgressState.None, null, delegate
                 {
                     var dialog = new MessageDialog("Bye Bye Homeless", "The mod has shut itself down to avoid compatibility issues. Stay tuned for further updates.\n\nIn the meantime it's safe to keep it subscribed.", "OK");
-                    GameManager.instance.userInterface.appBindings.ShowMessageDialog(dialog, delegate (int msg)
-                    {
-                        NotificationSystem.Pop("BBH_VERSION_NOTICE");
-                    });
+                    GameManager.instance.userInterface.appBindings.ShowMessageDialog(dialog, null);
+
+                    NotificationSystem.Pop("BBH_VERSION_NOTICE");
                 });
                 log.Info($"Mod disabled.");
                 return;
@@ -70,23 +69,20 @@ namespace ByeByeHomelessMod
 
             AssetDatabase.global.LoadSettings(nameof(Mod), Setting, new Setting(this));
 
-            if (Setting.ShowUpdateNotice20241130)
+            if (Setting.ShowUpdateNotice20241227)
             {
-                NotificationSystem.Push("BBH_UPDATE_NOTICE_20241130", "Bye Bye Homeless", "The mod is updated for game version 1.1.12f. Click to learn more.", null, null, null, ProgressState.None, null, delegate
+                NotificationSystem.Push("BBH_UPDATE_NOTICE_20241227", "Bye Bye Homeless", "The mod is updated for game version 1.2.0f. Click to learn more.", null, null, null, ProgressState.None, null, delegate
                 {
-                    var dialog = new MessageDialog("Bye Bye Homeless", "The mod adjusts the game logic to minimize instances where citizens become permanently homeless.\n\nFor first-time installations or if you suspect problems with homelessness later on, use the remove-homeless buttons in the settings to clear homeless citizens.", "OK");
+                    var dialog = new MessageDialog("Bye Bye Homeless", "The mod adjusts the game logic to minimize instances where citizens become permanently homeless.\n\nFor first-time installations or if you suspect problems with homelessness later on, use the remove-homeless buttons in the settings to clear homeless citizens.\n\nButtons in the settings are single-ues. Clicking them triggers the action once instead of turning on a persistent feature.", "OK");
                     GameManager.instance.userInterface.appBindings.ShowMessageDialog(dialog, null);
 
-                    Setting.ShowUpdateNotice20241130 = false;
-                    NotificationSystem.Pop("BBH_UPDATE_NOTICE_20241130");
+                    Setting.ShowUpdateNotice20241227 = false;
+                    NotificationSystem.Pop("BBH_UPDATE_NOTICE_20241227");
                 });
             }
 
             World.DefaultGameObjectInjectionWorld.GetOrCreateSystemManaged<HouseholdFindPropertySystem>().Enabled = false;
             updateSystem.UpdateAt<ModifiedHouseholdFindPropertySystem>(SystemUpdatePhase.GameSimulation);
-
-            World.DefaultGameObjectInjectionWorld.GetOrCreateSystemManaged<RemovedSystem>().Enabled = false;
-            updateSystem.UpdateAt<ModifiedRemovedSystem>(SystemUpdatePhase.Modification5);
 
             World.DefaultGameObjectInjectionWorld.GetOrCreateSystemManaged<AccidentSiteSystem>().Enabled = false;
             updateSystem.UpdateAt<ModifiedAccidentSiteSystem>(SystemUpdatePhase.GameSimulation);
@@ -112,7 +108,7 @@ namespace ByeByeHomelessMod
         }
 
         [SettingsUIHidden]
-        public bool ShowUpdateNotice20241130 { get; set; }
+        public bool ShowUpdateNotice20241227 { get; set; }
 
 
         public bool ApplyHomelessnessFix
@@ -166,7 +162,7 @@ namespace ByeByeHomelessMod
 
         public override void SetDefaults()
         {
-            ShowUpdateNotice20241130 = true;
+            ShowUpdateNotice20241227 = true;
             EvictExtraCompany = false;
         }
     }
@@ -187,9 +183,9 @@ namespace ByeByeHomelessMod
                 { _mSetting.GetSettingsLocaleID(), "Bye Bye Homeless" },
                 { _mSetting.GetOptionLabelLocaleID(nameof(Setting.ApplyHomelessnessFix)), "Apply homelessness bug fix" },
                 { _mSetting.GetOptionDescLocaleID(nameof(Setting.ApplyHomelessnessFix)), "This is an indicator that the homelessness bug fix is applied." },
-                { _mSetting.GetOptionLabelLocaleID(nameof(Setting.DeportHomeless)), "Deport Homeless" },
+                { _mSetting.GetOptionLabelLocaleID(nameof(Setting.DeportHomeless)), "Deport homeless" },
                 { _mSetting.GetOptionDescLocaleID(nameof(Setting.DeportHomeless)), "Visa canceled! Let the campers in your parks find a way to leave the city right now." },
-                { _mSetting.GetOptionLabelLocaleID(nameof(Setting.ArrestHomeless)), "Arrest Homeless" },
+                { _mSetting.GetOptionLabelLocaleID(nameof(Setting.ArrestHomeless)), "Arrest homeless" },
                 { _mSetting.GetOptionDescLocaleID(nameof(Setting.ArrestHomeless)), "Send out cops to jail the homeless lifebeings." },
                 { _mSetting.GetOptionLabelLocaleID(nameof(Setting.RemoveStuckHomeless)), "Remove stuck homeless" },
                 { _mSetting.GetOptionDescLocaleID(nameof(Setting.RemoveStuckHomeless)), "Instantly remove homeless citizens stuck on the streets, those in parks NOT included." },

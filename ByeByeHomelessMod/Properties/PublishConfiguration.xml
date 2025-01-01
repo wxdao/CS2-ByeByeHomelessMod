@@ -2,7 +2,7 @@
 	<!--Id must be set in order to update existed mod. it is not required for publishing mod for the first time-->
 	<ModId Value="84571" />
 	<!--Name of the mod to display to players-->
-	<DisplayName Value="Bye Bye Homeless (updated for 1.1.12f)" />
+	<DisplayName Value="Bye Bye Homeless (updated for 1.2.0f1)" />
 	<!--Short description of the mod-->
 	<ShortDescription Value="Fix unexpected homelessness." />
 	<!--Long description of the mod. Single line or multi line. Supports minimal markdown subset-->
@@ -13,7 +13,7 @@ The mod adjusts the game logic to minimize instances where citizens become perma
 
 There are bugs in the game:
 - Only a specific group of citizens (always the same ones) can look for houses. If this group can't find housing, the others never get a chance, resulting them forever stuck on the streets.
-- Although parks have a set homeless capacity, they can actually hold an unlimited number of homeless citizens.
+- (Before 1.2.0f1) Although parks have a set homeless capacity, they can actually hold an unlimited number of homeless citizens.
 - Campers can stay in the parks as long as they wish.
 
 For first-time installations or if you suspect problems with homelessness later on, use the remove-homeless buttons in the settings to clear homeless citizens.
@@ -29,19 +29,18 @@ For first-time installations or if you suspect problems with homelessness later 
 	<!--Link to the forum post where the mod can be discussed-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/bye-bye-homeless.1694220/" />
 	<!--Version of the mod-->
-	<ModVersion Value="3.5.4" />
+	<ModVersion Value="3.6.0" />
 	<!--Recommended version of the base game to use the mod-->
-	<GameVersion Value="1.1.*" />
+	<GameVersion Value="1.2.*" />
 	<!--Dependency for the mod, can be set multiple times-->
 	<Dependency Id="" />
 	<!--Change log for new version. Single line or multi line. Supports minimal markdown subset-->
 	<ChangeLog>
-- Fix a bug in the game's criminal system. (3.5.1 - 3.5.4)
+- Updated for 1.2.0f1. (3.6.0)
+- Fix bugs in the game's criminal system. (3.5.1 - 3.5.4)
 - Updated for 1.1.12f; add "arrest homeless" button. (3.5.0)
-- Revert some changes. (3.4.0)
 - Campers have one month to find housing or they will be kicked out. (3.3.0)
 - Parks no longer hold an unlimited number of homeless citizens. (3.2.0)
-- Re-enable FindPropertyTimeout. (3.1.0)
 - Updated for 1.1.11f. (3.0.0)
 	</ChangeLog>
 	<!--External link. supported types are discord, github, youtube, twitch, x, paypal, patreon, buymeacoffee, kofi, crowdin, gitlab-->
